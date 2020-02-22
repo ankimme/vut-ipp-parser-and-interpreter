@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="IPPcode20">
+  <instruction order="1" opcode="MOVE">
+    <arg1 type="var">LF@foo</arg1>
+    <arg2 type="bool">true</arg2>
+  </instruction>
+  <instruction order="2" opcode="CREATEFRAME"/>
+  <instruction order="3" opcode="PUSHFRAME"/>
+  <instruction order="4" opcode="POPFRAME"/>
+  <instruction order="5" opcode="DEFVAR">
+    <arg1 type="var">TF@bar</arg1>
+  </instruction>
+  <instruction order="6" opcode="CALL">
+    <arg1 type="label">foo</arg1>
+  </instruction>
+  <instruction order="7" opcode="RETURN"/>
+  <instruction order="8" opcode="PUSHS">
+    <arg1 type="nil">nil</arg1>
+  </instruction>
+  <instruction order="9" opcode="POPS">
+    <arg1 type="var">GF@foo</arg1>
+  </instruction>
+  <instruction order="10" opcode="ADD">
+    <arg1 type="var">GF@bar</arg1>
+    <arg2 type="int">1</arg2>
+    <arg3 type="int">2</arg3>
+  </instruction>
+  <instruction order="11" opcode="SUB">
+    <arg1 type="var">GF@bar</arg1>
+    <arg2 type="int">1</arg2>
+    <arg3 type="int">2</arg3>
+  </instruction>
+  <instruction order="12" opcode="MUL">
+    <arg1 type="var">GF@bar</arg1>
+    <arg2 type="int">1</arg2>
+    <arg3 type="int">2</arg3>
+  </instruction>
+  <instruction order="13" opcode="IDIV">
+    <arg1 type="var">GF@bar</arg1>
+    <arg2 type="int">1</arg2>
+    <arg3 type="int">2</arg3>
+  </instruction>
+  <instruction order="14" opcode="LT">
+    <arg1 type="var">TF@foo</arg1>
+    <arg2 type="bool">true</arg2>
+    <arg3 type="bool">false</arg3>
+  </instruction>
+  <instruction order="15" opcode="GT">
+    <arg1 type="var">TF@foo</arg1>
+    <arg2 type="bool">true</arg2>
+    <arg3 type="bool">false</arg3>
+  </instruction>
+  <instruction order="16" opcode="EQ">
+    <arg1 type="var">TF@foo</arg1>
+    <arg2 type="bool">true</arg2>
+    <arg3 type="bool">false</arg3>
+  </instruction>
+  <instruction order="17" opcode="AND">
+    <arg1 type="var">LF@bar</arg1>
+    <arg2 type="bool">false</arg2>
+    <arg3 type="bool">false</arg3>
+  </instruction>
+  <instruction order="18" opcode="OR">
+    <arg1 type="var">LF@bar</arg1>
+    <arg2 type="bool">false</arg2>
+    <arg3 type="bool">false</arg3>
+  </instruction>
+  <instruction order="19" opcode="NOT">
+    <arg1 type="var">LF@bar</arg1>
+    <arg2 type="bool">false</arg2>
+  </instruction>
+  <instruction order="20" opcode="INT2CHAR">
+    <arg1 type="var">LF@bar</arg1>
+    <arg2 type="int">2</arg2>
+  </instruction>
+  <instruction order="21" opcode="STRI2INT">
+    <arg1 type="var">LF@bar</arg1>
+    <arg2 type="string"></arg2>
+    <arg3 type="int">2</arg3>
+  </instruction>
+  <instruction order="22" opcode="READ">
+    <arg1 type="var">LF@bar</arg1>
+    <arg2 type="type">bool</arg2>
+  </instruction>
+  <instruction order="23" opcode="WRITE">
+    <arg1 type="int">42</arg1>
+  </instruction>
+  <instruction order="24" opcode="CONCAT">
+    <arg1 type="var">LF@x</arg1>
+    <arg2 type="string">a</arg2>
+    <arg3 type="string">\123</arg3>
+  </instruction>
+  <instruction order="25" opcode="STRLEN">
+    <arg1 type="var">LF@x</arg1>
+    <arg2 type="string">\032\0233213</arg2>
+    <arg3 type="label">#####ffdfodffd</arg3>
+  </instruction>
+  <instruction order="26" opcode="GETCHAR">
+    <arg1 type="var">LF@x</arg1>
+    <arg2 type="string">foo</arg2>
+    <arg3 type="int">1</arg3>
+  </instruction>
+  <instruction order="27" opcode="SETCHAR">
+    <arg1 type="var">LF@x</arg1>
+    <arg2 type="int">1</arg2>
+    <arg3 type="string">a</arg3>
+  </instruction>
+  <instruction order="28" opcode="TYPE">
+    <arg1 type="var">GF@x</arg1>
+    <arg2 type="bool">true</arg2>
+  </instruction>
+  <instruction order="29" opcode="LABEL">
+    <arg1 type="label">foo</arg1>
+  </instruction>
+  <instruction order="30" opcode="LABEL">
+    <arg1 type="label">bar</arg1>
+  </instruction>
+  <instruction order="31" opcode="LABEL">
+    <arg1 type="label">foo</arg1>
+  </instruction>
+  <instruction order="32" opcode="JUMP">
+    <arg1 type="label">foo</arg1>
+  </instruction>
+  <instruction order="33" opcode="JUMPIFEQ">
+    <arg1 type="label">foo</arg1>
+    <arg2 type="bool">true</arg2>
+    <arg3 type="bool">false</arg3>
+  </instruction>
+  <instruction order="34" opcode="JUMPIFNEQ">
+    <arg1 type="label">bar</arg1>
+    <arg2 type="bool">false</arg2>
+    <arg3 type="bool">true</arg3>
+  </instruction>
+  <instruction order="35" opcode="EXIT">
+    <arg1 type="int">42</arg1>
+  </instruction>
+  <instruction order="36" opcode="DPRINT">
+    <arg1 type="int">42</arg1>
+  </instruction>
+  <instruction order="37" opcode="BREAK"/>
+</program>

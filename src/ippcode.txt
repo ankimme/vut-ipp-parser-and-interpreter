@@ -1,0 +1,46 @@
+.IPPcode20
+
+MOVE LF@foo bool@true
+CREATEFRAME
+PUSHFRAME
+POPFRAME
+DEFVAR TF@bar
+CALL foo
+RETURN
+
+PUSHS nil@nil
+POPS GF@foo
+
+ADD GF@bar int@1 int@2
+SUB GF@bar int@1 int@2
+MUL GF@bar int@1 int@2
+   IDIV GF@bar 	int@1 int@2
+LT TF@foo bool@true bool@false
+GT TF@foo bool@true bool@false
+EQ TF@foo bool@true bool@false
+AND LF@bar bool@false bool@false
+OR LF@bar 		bool@false bool@false # barfddf
+NOT LF@bar bool@false
+INT2CHAR LF@bar int@2
+STRI2INT LF@bar string@ int@2
+
+READ LF@bar bool
+WRITE int@42
+
+CONCAT LF@x   string@a string@\123
+STRLEN LF@x string@\032\0233213 #####ffdfodffd
+GETCHAR LF@x string@foo int@1
+SETCHAR LF@x int@1 string@a
+
+TYPE GF@x bool@true
+
+      LABEL foo
+LABEL bar
+   LABEL foo
+JUMP foo
+   JUMPIFEQ foo bool@true     bool@false
+JUMPIFNEQ bar bool@false bool@true
+EXIT int@42
+
+DPRINT int@42
+BREAK
