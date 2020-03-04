@@ -52,7 +52,7 @@
                 $line_words = explode(" ", $line);
 
                 // skip empty line or comment
-                if (count($line_words) == 0)
+                if (count($line_words) == 1 && empty($line_words[0]))
                 {
                     continue;
                 }
@@ -102,7 +102,7 @@
                         {
                             if (!preg_match('~#.*~', $line_words[$param_index], $out))
                             {
-                                echo $opcode . PHP_EOL . $line_words[$param_index] . PHP_EOL; // todo delete
+                                // echo $opcode . PHP_EOL . $line_words[$param_index] . PHP_EOL; // todo delete
                                 fwrite(STDERR, "Too many parameters\n");
                                 exit(ExitCodesEnum::LexicalOrSyntaxError);
                             }
@@ -163,7 +163,7 @@
                                 }
                                 else
                                 {
-                                    echo $opcode . PHP_EOL . $line_words[$i] . PHP_EOL; // todo delete
+                                    // echo $opcode . PHP_EOL . $line_words[$i] . PHP_EOL; // todo delete
                                     fwrite(STDERR, "Found unknown parameter\n");
                                     exit(ExitCodesEnum::LexicalOrSyntaxError);
                                 }
@@ -211,7 +211,7 @@
                 // }
                 else
                 {
-                    echo $line; // todo delete
+                    // echo $line; // todo delete
                     fwrite(STDERR, "Invalid opcode\n");
                     exit(ExitCodesEnum::InvalidOpCode);
                     // var_dump($line_words);
@@ -239,7 +239,7 @@
                 $line_words = explode(" ", $line);
 
                 // skip empty line or comment
-                if (count($line_words) == 0)
+                if (count($line_words) == 1 && empty($line_words[0]))
                 {
                     continue;
                 }
@@ -261,7 +261,7 @@
 
         static public function show_help()
         {
-            echo "static help" . PHP_EOL; // todo write help
+            echo "help" . PHP_EOL; // todo write help
         }
 
         private function create_instruction_info_array()
