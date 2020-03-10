@@ -73,13 +73,13 @@
                             switch ($expected_param)
                             {
                                 case ParamEnum::Vari:
-                                    $param_regex = '~(LF|TF|GF)@([a-zA-Z_$&%!?*-])+~';
+                                    $param_regex = '~(LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~';
                                     break;
                                 case ParamEnum::Symb:
-                                    $param_regex = '~((LF|TF|GF)@([a-zA-Z_$&%!?*-])+)|((bool@(true|false))|nil@nil|int@([\d+-])+|string@([\S])*)~';
+                                    $param_regex = '~((LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$))|((bool@(true|false))|nil@nil|int@([\d+-])+|string@([\S])*)~';
                                     break;
                                 case ParamEnum::Label:
-                                    $param_regex = '~([a-zA-Z_$&%!?*-])+~';
+                                    $param_regex = '~(\s|^)[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~';
                                     break;
                                 case ParamEnum::Type:
                                     $param_regex = '~(string|int|bool)~';
@@ -146,7 +146,7 @@
                                     $xml_arg->nodeValue = explode("@", $line_words[$i])[1]; // TODO control boundaries
                                     $xml_arg->setAttribute('type', 'nil');
                                 }
-                                else if (preg_match('~(LF|TF|GF)@([a-zA-Z_$&%!?*-])+~', $line_words[$i], $out)) // promenna
+                                else if (preg_match('~(LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~', $line_words[$i], $out)) // promenna
                                 {
                                     $xml_arg->nodeValue = $line_words[$i];
                                     $xml_arg->setAttribute('type', 'var');
@@ -156,7 +156,7 @@
                                     $xml_arg->nodeValue = $line_words[$i];
                                     $xml_arg->setAttribute('type', 'type');
                                 }
-                                else if (preg_match('~([a-zA-Z_$&%!?*-])+~', $line_words[$i], $out)) // navestri
+                                else if (preg_match('~(\s|^)[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~', $line_words[$i], $out)) // navestri
                                 {
                                     $xml_arg->nodeValue = $line_words[$i];
                                     $xml_arg->setAttribute('type', 'label');
