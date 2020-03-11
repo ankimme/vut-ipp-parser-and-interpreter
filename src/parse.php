@@ -2,7 +2,7 @@
 
     require_once 'exitCodes.php';
     
-    // parameters types of IPPcode20 instructions 
+    // types of IPPcode20 instruction parameters
     abstract class ParamEnum
     {
         const Vari = 0;
@@ -13,9 +13,8 @@
     
     class Parser
     {
-        private $iia;
-        // private $retrn_code; todo delete
-        private $counter;
+        private $iia; // instruction info array
+        private $counter; // instruction counter
         private $xml_dom;
 
         // initiate variables
@@ -25,9 +24,9 @@
             $this->counter = 1;
             $this->xml_dom = new DOMDocument('1.0', 'UTF-8');
             $this->xml_dom->formatOutput = true;
-            
         }
 
+        // generate and print xml representation of IPPcode20 on stdout
         public function generate_xml()
         {
             $xml_progam = $this->xml_dom->createElement("program");
@@ -58,7 +57,6 @@
                 }
                 else if (preg_match('~#.*~', $line_words[0], $out))
                 {
-                    // $stats["com"]++; todo stats
                     continue;
                 }
 
@@ -73,16 +71,16 @@
                             switch ($expected_param)
                             {
                                 case ParamEnum::Vari:
-                                    $param_regex = '~(LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~';
+                                    $param_regex = '~(LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$|#)~';
                                     break;
                                 case ParamEnum::Symb:
-                                    $param_regex = '~((LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$))|((bool@(true|false))|nil@nil|int@([\d+-])+|string@([\S])*)~';
+                                    $param_regex = '~((LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$|#))|((bool@(true|false)(\s|$|#))|nil@nil(\s|$|#)|int@([\d+-])+(\s|$|#)|string@([\S])*(\s|$|#))~';
                                     break;
                                 case ParamEnum::Label:
-                                    $param_regex = '~(\s|^)[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~';
+                                    $param_regex = '~(\s|^)[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$|#)~';
                                     break;
                                 case ParamEnum::Type:
-                                    $param_regex = '~(string|int|bool)~';
+                                    $param_regex = '~(string|int|bool)(\s|$|#)~';
                                     break;
                                 default:
                                     fwrite(STDERR, "Internal error\n");
@@ -90,6 +88,7 @@
                                     break;
                             }
                         
+                            // compare instruction parameter with appropriate regex
                             if (!preg_match($param_regex, $line_words[$param_index], $out))
                             {
                                 fwrite(STDERR, "Expected parameter not valid\n");
@@ -102,14 +101,9 @@
                         {
                             if (!preg_match('~#.*~', $line_words[$param_index], $out))
                             {
-                                // echo $opcode . PHP_EOL . $line_words[$param_index] . PHP_EOL; // todo delete
                                 fwrite(STDERR, "Too many parameters\n");
                                 exit(ExitCodesEnum::LexicalOrSyntaxError);
                             }
-                            // else todo stats
-                            // {
-                            //     $stats["com"]++;
-                            // }
                         }
 
                         // create instruction element
@@ -125,45 +119,44 @@
                             {
                                 $xml_arg = $this->xml_dom->createElement('arg' . $i);
 
-                                if (preg_match('~int@([\d+-])+~', $line_words[$i], $out)) // int
+                                if (preg_match('~int@([\d+-])+(\s|$|#)~', $line_words[$i], $out)) // int
                                 {
-                                    $xml_arg->nodeValue = explode("@", $line_words[$i])[1]; // TODO control boundaries
+                                    $xml_arg->nodeValue = explode("@", $line_words[$i])[1];
                                     $xml_arg->setAttribute('type', 'int');
 
                                 }
-                                else if (preg_match('~string@([\S])*~', $line_words[$i], $out)) // string
+                                else if (preg_match('~string@([\S])*(\s|$|#)~', $line_words[$i], $out)) // string
                                 {
-                                    $xml_arg->nodeValue = explode("@", $line_words[$i])[1]; // TODO control boundaries + neprevadet escape sekvence
+                                    $xml_arg->nodeValue = explode("@", $line_words[$i])[1];
                                     $xml_arg->setAttribute('type', 'string');
                                 }
-                                else if (preg_match('~bool@(true|false)~', $line_words[$i], $out)) // bool
+                                else if (preg_match('~bool@(true|false)(\s|$|#)~', $line_words[$i], $out)) // bool
                                 {
-                                    $xml_arg->nodeValue = explode("@", strtolower($line_words[$i]))[1]; // TODO control boundaries
+                                    $xml_arg->nodeValue = explode("@", strtolower($line_words[$i]))[1];
                                     $xml_arg->setAttribute('type', 'bool');
                                 }
-                                else if (preg_match('~nil@nil~', $line_words[$i], $out)) // nil
+                                else if (preg_match('~nil@nil(\s|$|#)~', $line_words[$i], $out)) // nil
                                 {
-                                    $xml_arg->nodeValue = explode("@", $line_words[$i])[1]; // TODO control boundaries
+                                    $xml_arg->nodeValue = explode("@", $line_words[$i])[1];
                                     $xml_arg->setAttribute('type', 'nil');
                                 }
-                                else if (preg_match('~(LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~', $line_words[$i], $out)) // promenna
+                                else if (preg_match('~(LF|TF|GF)@[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$|#)~', $line_words[$i], $out)) // variable
                                 {
-                                    $xml_arg->nodeValue = $line_words[$i];
+                                    $xml_arg->nodeValue = htmlspecialchars($line_words[$i]);
                                     $xml_arg->setAttribute('type', 'var');
                                 }
-                                else if (preg_match('~(string|int|bool)~', $line_words[$i], $out)) // typ
+                                else if (preg_match('~(string|int|bool)(\s|$|#)~', $line_words[$i], $out)) // type
                                 {
                                     $xml_arg->nodeValue = $line_words[$i];
                                     $xml_arg->setAttribute('type', 'type');
                                 }
-                                else if (preg_match('~(\s|^)[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$)~', $line_words[$i], $out)) // navestri
+                                else if (preg_match('~(\s|^)[a-zA-Z_$&%!?*-][a-zA-Z0-9_$&%!?*-]*(\s|$|#)~', $line_words[$i], $out)) // label
                                 {
                                     $xml_arg->nodeValue = $line_words[$i];
                                     $xml_arg->setAttribute('type', 'label');
                                 }
                                 else
                                 {
-                                    // echo $opcode . PHP_EOL . $line_words[$i] . PHP_EOL; // todo delete
                                     fwrite(STDERR, "Found unknown parameter\n");
                                     exit(ExitCodesEnum::LexicalOrSyntaxError);
                                 }
@@ -177,53 +170,24 @@
                         }
                         
                         $xml_progam->appendChild($xml_instruction);
-                        // $stats["loc"]++; todo stats
                     }
-                    else
+                    else // instruction has not enough parameters
                     {
                         fwrite(STDERR, "Not enough parameters\n");
                         exit(ExitCodesEnum::LexicalOrSyntaxError);
                     }
-
-                    // label statistics
-                    // if ("label" == $line_words[0]) todo stats
-                    // {
-                    //     if (!in_array($line_words[1], $labels))
-                    //     {
-                    //         array_push( $labels, $line_words[1]);
-                    //         $stats["lab"]++;
-                    //     }
-                    // }
-
-                    // if ("jump" == $line_words[0] || "jumpifeq" == $line_words[0] || "jumpifneq" == $line_words[0])
-                    // {
-                    //     $stats["jum"]++;
-                    // }
                 }
-                // else if (preg_match('~#.*~', $line_words[0], $out)) // komentar todo delete
-                // {
-                //     echo "WTF TADY KOMENTAR?\n"; // todo delete
-                // }
-                // else if (empty($line_words[0])) // prazdny radek
-                // {
-                //     echo "prazdny radek\n";
-                //     continue;
-                // }
                 else
                 {
-                    // echo $line; // todo delete
                     fwrite(STDERR, "Invalid opcode\n");
                     exit(ExitCodesEnum::InvalidOpCode);
-                    // var_dump($line_words);
-                    // echo "neznamy prikaz\n";
-                    // exit(1); // todo delete
                 }
 
                 $this->counter++;
             }
-            echo $this->xml_dom->saveXML();
-            // echo "ahoj"; todo
 
+            // print generated xml on stdout
+            echo $this->xml_dom->saveXML();
         }
 
         // returns true if header is found, otherwise false
@@ -245,25 +209,23 @@
                 }
                 else if (preg_match('~#.*~', $line_words[0], $out))
                 {
-                    // $stats["com"]++; todo stats
                     continue;
                 }
-
                 // header check
-                return preg_match('~^(\s)*((.IPPcode20(\s)+#+)|(.IPPcode20)(\s)*$)~', $line, $out); // todo test
+                return preg_match('~^(\s)*((.IPPcode20(\s)+#+)|(.IPPcode20)(\s)*$)~i', $line, $out);
             }
+            echo $this->xml_dom->saveXML();
+            exit(ExitCodesEnum::Success); // end the program success in case of blank file on input
         }
 
-        // private function parse_instruction($line)
-        // {
-
-        // }
-
+        // print program help on stdin
         static public function show_help()
         {
-            echo "help" . PHP_EOL; // todo write help
+            echo "Parse.php is a simple script which expects and reads IPPcode20 source code from stdin.\n";
+            echo "The script then checks for lexical and syntactic errors in the source code and outputs an XML representation on stdout.\n";
         }
 
+        // return an array which specifies what parameters (array values) do IPPcode20 instructions (array keys) expect
         private function create_instruction_info_array()
         {
             $iia = array(); // instruction info array
@@ -277,10 +239,10 @@
             $iia['return'] = [];
             $iia['pushs'] = [ParamEnum::Symb];
             $iia['pops'] = [ParamEnum::Vari];
-            $iia['add'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb]; // todo musi byt int u +-*/
-            $iia['sub'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb]; // todo musi byt int u +-*/
-            $iia['mul'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb]; // todo musi byt int u +-*/
-            $iia['idiv'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb]; // todo musi byt int u +-*/
+            $iia['add'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
+            $iia['sub'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
+            $iia['mul'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
+            $iia['idiv'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
             $iia['lt'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
             $iia['gt'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
             $iia['eq'] = [ParamEnum::Vari, ParamEnum::Symb, ParamEnum::Symb];
@@ -329,51 +291,5 @@
 
     $parse = new Parser();
     $parse->generate_xml();
-
-    // process --stats argument
-    // $stats_enabled = false;
-    // $stats = [
-    //     "loc" => 0,
-    //     "com" => 0,
-    //     "lab" => 0,
-    //     "jum" => 0];
-    // if (array_key_exists("loc", $options) || array_key_exists("comments", $options) || array_key_exists("labels", $options) || array_key_exists("jumps", $options))
-    // {
-    //     if (array_key_exists("stats", $options))
-    //     {
-    //         $stats_enabled = true;
-    //     }
-    //     else 
-    //     {
-    //         fwrite(STDERR, "Missing stats argument\n");
-    //         exit(ExitCodesEnum::ArgumentError);
-    //     }
-    // }
-    
-
-    /* MAIN FUNCTIONALITY */
-
-    // $counter = 1;
-    // $expecting_header = true;
-    // $iia = create_instruction_info_array();
-    // $labels = [];
-    // $param_regex =
-    // ['~(LF|TF|GF)@([a-zA-Z_$&%!?*-])+~', // var
-    // '~((LF|TF|GF)@([a-zA-Z_$&%!?*-])+)|((bool@(true|false))|nil@nil|int@([\d+-])+|string@([\S])*)~', // symb
-    // '~([a-zA-Z_$&%!?*-])+~', // label
-    // '~(string|int|bool)~']; // type
-
-    // $xml = new SimpleXMLElement('<xml/>'); delete
-    
-
-    // prochazeni souboru radek po radku
-    
-
-    // Header('Content-type: text/xml');
-    // print($xml->asXML()); delete
-    // echo $xml_dom->saveXML();
-
-    // TODO UTF-8 kodovani
-    // TODO check regexes
 
 ?>
