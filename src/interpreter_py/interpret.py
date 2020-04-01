@@ -20,6 +20,11 @@ class Interpret:
             sys.stderr.write("Input XML not well formed\n")
             exit(ec.XML_NOT_WELL_FORMED_ERROR)
 
+        self.temporary_frame = None
+        self.local_frame_stack = []
+        self.global_frame = []
+
+
     def read_xml_source(self):
         """
         Read xml source file or stdin, based on arguments given to the script
@@ -112,12 +117,90 @@ class Interpret:
         # print(self.input_string)
         # interpretation body
         for element in self.root:
-            print(element.attrib)
-            pass
-
+            instruction = Instruction(element)
+            instruction_handler = self.instruction_swticher(instruction.opcode)
+            instruction_handler(instruction)
 
         print("--------END--------")
 
+    def instruction_swticher(self, opcode):
+        if opcode == "MOVE":
+            return self.ins_move
+        elif opcode == "CREATEFRAME":
+            return self.ins_create_frame
+        elif opcode == "PUSHFRAME":
+            return self.ins_push_frame
+        elif opcode == "POPFRAME":
+            return self.ins_pop_frame
+        elif opcode == "DEFVAR":
+            return self.ins_defvar
+        else:
+            sys.stderr.write(f"Opcode {opcode} not valid\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+    def ins_move(self, ins):
+        pass
+
+    def ins_create_frame(self, ins):
+        self.temporary_frame = []
+
+    def ins_push_frame(self, ins):
+        if self.temporary_frame is None:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
+            exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        self.local_frame_stack.append(self.temporary_frame)
+        self.temporary_frame = None
+
+    def ins_pop_frame(self, ins):
+        if len(self.local_frame_stack) == 0:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
+            exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        self.temporary_frame = self.local_frame_stack.pop()
+
+    def ins_defvar(self, ins):
+        frame, variable_name = ins.arg1[1].split("@")
+        if frame == "GF":
+            if any(variable["name"] == variable_name for variable in self.global_frame):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in global context.\n")
+                exit(ec.SEMANTIC_ERROR)
+            self.global_frame.append({"name": variable_name, "value": None})
+        elif frame == "LF":
+            if len(self.local_frame_stack) == 0:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame not defined.\n")
+                exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+            if any(variable["name"] == variable_name for variable in self.local_frame_stack[-1]):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in local context.\n")
+                exit(ec.SEMANTIC_ERROR)
+            self.local_frame_stack[-1].append({"name": variable_name, "value": None})
+        elif frame == "TF":
+            if self.temporary_frame is None:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
+                exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+            if any(variable["name"] == variable_name for variable in self.temporary_frame):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in temporary context.\n")
+                exit(ec.SEMANTIC_ERROR)
+            self.temporary_frame.append({"name": variable_name, "value": None})
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+
+class Instruction:
+    
+    def __init__(self, instruction_element):
+        self.opcode = instruction_element.attrib['opcode']
+        self.order = instruction_element.attrib['order']
+        # arguments are tuples (type, value)
+        arg_element = instruction_element.find("arg1")
+        self.arg1 = (arg_element.attrib['type'], arg_element.text) if arg_element is not None else None
+
+        arg_element = instruction_element.find("arg2")
+        self.arg2 = (instruction_element.find("arg2"), arg_element.text) if arg_element is not None else None
+
+        arg_element = instruction_element.find("arg3")
+        self.arg3 = (instruction_element.find("arg3"), arg_element.text) if arg_element is not None else None
+
+    # todo lex and syn control
 
 interpret = Interpret()
 interpret.check_xml_structure()
