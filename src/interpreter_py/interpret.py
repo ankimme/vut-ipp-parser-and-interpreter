@@ -3,16 +3,20 @@ import argparse
 import sys
 import re
 from exit_codes import ExitCodes as ec
-import custom_exceptions
+
 
 class Interpret:
 
     def __init__(self):
         self.arguments = self.process_arguments()
-        xml_string = self.process_xml_source()
-        self.root = ET.fromstring(xml_string)
+        xml_string = self.read_xml_source()
+        try:
+            self.root = ET.fromstring(xml_string)
+        except ET.ParseError:
+            sys.stderr.write("Input XML not well formed\n")
+            exit(ec.XML_NOT_WELL_FORMED_ERROR)
 
-    def process_xml_source(self):
+    def read_xml_source(self):
         """
         Read xml source file or stdin, based on arguments given to the script
         Returns a string representation of the xml
@@ -21,11 +25,11 @@ class Interpret:
             try:
                 with open(self.arguments.source, 'r') as source:
                     xml_string = source.read()
-            except:
-                sys.stderr.write("Could not open source file.")
-                raise InputFileError
+            except FileNotFoundError:
+                sys.stderr.write(f"Input file '{self.arguments.source}' not found\n")
+                exit(ec.INPUT_FILE_ERROR)
         else:
-            xml_string = sys.stdin.read()
+            xml_string = stdin.read()  # todo handle error
         return xml_string
 
     def process_arguments(self):
@@ -45,28 +49,61 @@ class Interpret:
 
     def check_xml_structure(self):
         self.check_root_element()
+        # todo check other stuff
 
     def check_root_element(self):
         if not re.match("^program$", self.root.tag, re.I):
-            raise custom_exceptions.XmlWrongStructureError
+            sys.stderr.write(f"Expected root element to be 'program', found '{self.root.tag}'\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
         if len(self.root.attrib) != 1:
-            raise custom_exceptions.XmlWrongStructureError
+            sys.stderr.write(f"Expected only one attribute of 'program' element, found {len(self.root.attrib)}\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-        "language" in self.root.attrib and re.match("^ippcode20$", self.root.attrib["language"], re.I)
+        if not ("language"  in self.root.attrib and re.match("^ippcode20$", self.root.attrib["language"], re.I)):
+            sys.stderr.write("Expected 'program' element attribute to be 'language=ippcode20'\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
     def execute(self):
-        print("Executing")
-        print(self.root.tag)
-        print(type(self.root.attrib))
+        print("--------RUN--------")
+        # print(self.root.tag) todo delete
+        # print(type(self.root.attrib))
+        # todo lexical and syntactival analysis
+        # sorted = self.root.
+        # f = itemgetter('order')
+        # for element in self.root:
+        #     print(f(element.attrib))
+        # sorted = self.root.findall('instruction').sort()
+        # print(f())
+        # parent = self.root
+        # attr = 'order'
+        try:
+            self.root[:] = sorted(self.root, key=lambda child: int(child.get('order')))  # todo check double value abd negative values
+        except ValueError:
+            sys.stderr.write("Order attribute value not valid\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+        # interpretation body
+        for element in self.root:
+            print(element.attrib)
+            pass
+
+
+        print("--------END--------")
 
 
 interpret = Interpret()
 interpret.check_xml_structure()
 interpret.execute()
+# except ex.InputFileError:
+#     sys.stderr.write("Could not open input file")
+#     exit(ec.INPUT_FILE_ERROR)
+# except ex.XmlWrongStructureError:
+#     exit(ec.XML_WRONG_STRUCTURE_ERROR)
+# except ET.ParseError:
+#     exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
 # print(interpret.__dict__)
-
 # source and input cannot be the same
 # if arguments.source == arguments.input:
 #     exit(ec.ARGUMENT_ERROR)
