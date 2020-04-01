@@ -9,6 +9,10 @@ class Interpret:
 
     def __init__(self):
         self.arguments = self.process_arguments()
+        if (self.arguments.source == self.arguments.input):
+            sys.stderr.write("Invalid arguments\n")
+            exit(ec.ARGUMENT_ERROR)
+        self.input_string = self.read_input()
         xml_string = self.read_xml_source()
         try:
             self.root = ET.fromstring(xml_string)
@@ -29,8 +33,24 @@ class Interpret:
                 sys.stderr.write(f"Input file '{self.arguments.source}' not found\n")
                 exit(ec.INPUT_FILE_ERROR)
         else:
-            xml_string = stdin.read()  # todo handle error
+            xml_string = sys.stdin.read()  # todo handle error
         return xml_string
+
+    def read_input(self):
+        """
+        Read input file or stdin, based on arguments given to the script
+        Returns a string representation of the input data
+        """
+        if self.arguments.input:
+            try:
+                with open(self.arguments.input, 'r') as source:
+                    input_string = source.read()
+            except FileNotFoundError:
+                sys.stderr.write(f"Input file '{self.arguments.input}' not found\n")
+                exit(ec.INPUT_FILE_ERROR)
+        else:
+            input_string = sys.stdin.read()
+        return input_string
 
     def process_arguments(self):
         """
@@ -56,11 +76,17 @@ class Interpret:
             sys.stderr.write(f"Expected root element to be 'program', found '{self.root.tag}'\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-        if len(self.root.attrib) != 1:
-            sys.stderr.write(f"Expected only one attribute of 'program' element, found {len(self.root.attrib)}\n")
+        if len(self.root.attrib) < 1 or len(self.root.attrib) > 3:
+            sys.stderr.write("Ivalid attributes of 'program' element\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-        if not ("language"  in self.root.attrib and re.match("^ippcode20$", self.root.attrib["language"], re.I)):
+        allowed_attributes = ['language', 'name', 'description']
+        for attr in self.root.attrib:
+            if attr not in allowed_attributes:
+                sys.stderr.write("Ivalid attributes of 'program' element\n")
+                exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+        if not ("language" in self.root.attrib and re.match("^ippcode20$", self.root.attrib["language"], re.I)):
             sys.stderr.write("Expected 'program' element attribute to be 'language=ippcode20'\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
@@ -83,6 +109,7 @@ class Interpret:
             sys.stderr.write("Order attribute value not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
+        # print(self.input_string)
         # interpretation body
         for element in self.root:
             print(element.attrib)
@@ -95,36 +122,3 @@ class Interpret:
 interpret = Interpret()
 interpret.check_xml_structure()
 interpret.execute()
-# except ex.InputFileError:
-#     sys.stderr.write("Could not open input file")
-#     exit(ec.INPUT_FILE_ERROR)
-# except ex.XmlWrongStructureError:
-#     exit(ec.XML_WRONG_STRUCTURE_ERROR)
-# except ET.ParseError:
-#     exit(ec.XML_WRONG_STRUCTURE_ERROR)
-
-# print(interpret.__dict__)
-# source and input cannot be the same
-# if arguments.source == arguments.input:
-#     exit(ec.ARGUMENT_ERROR)
-
-# # load xml
-
-
-# print(arguments)
-
-# print(xml_string)
-
-# tree = ET.parse(arguments.source)
-
-# print(tree)
-# root = tree.getroot()
-
-# print(root)
-
-# print(root.tag)
-# print(root.attrib)
-
-
-# for child in root:
-#     print(child.attrib)
