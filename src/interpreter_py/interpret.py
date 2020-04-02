@@ -23,7 +23,8 @@ class Interpret:
         self.temporary_frame = None
         self.local_frame_stack = []
         self.global_frame = []
-
+        self.data_stack = []
+        self.labels = []
 
     def read_xml_source(self):
         """
@@ -73,10 +74,16 @@ class Interpret:
         return argument_parser.parse_args()
 
     def check_xml_structure(self):
+        """
+        Control 
+        """
         self.check_root_element()
         # todo check other stuff
 
     def check_root_element(self):
+        """
+        Control if the root element of the xml is valid
+        """
         if not re.match("^program$", self.root.tag, re.I):
             sys.stderr.write(f"Expected root element to be 'program', found '{self.root.tag}'\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
@@ -96,6 +103,9 @@ class Interpret:
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
     def execute(self):
+        """
+        Interpret source code.
+        """
         print("--------RUN--------")
         # print(self.root.tag) todo delete
         # print(type(self.root.attrib))
@@ -116,14 +126,21 @@ class Interpret:
 
         # print(self.input_string)
         # interpretation body
-        for element in self.root:
-            instruction = Instruction(element)
+        self.i = 0
+        while self.i < len(self.root):
+            element = self.root[self.i]
+            instruction = Instruction(element, self.i)
             instruction_handler = self.instruction_swticher(instruction.opcode)
             instruction_handler(instruction)
+            self.i += 1
+            # todo jump to not discovered labels
 
         print("--------END--------")
 
     def instruction_swticher(self, opcode):
+        """
+        Returns the function that should be called based on the given opcode.
+        """
         if opcode == "MOVE":
             return self.ins_move
         elif opcode == "CREATEFRAME":
@@ -134,17 +151,32 @@ class Interpret:
             return self.ins_pop_frame
         elif opcode == "DEFVAR":
             return self.ins_defvar
+        elif opcode == "WRITE":
+            return self.ins_write
+        elif opcode == "LABEL":
+            return self.ins_label
+        elif opcode == "JUMP":
+            return self.ins_jump
         else:
             sys.stderr.write(f"Opcode {opcode} not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
     def ins_move(self, ins):
+        """
+        Execute MOVE instruction
+        """
         pass
 
     def ins_create_frame(self, ins):
+        """
+        Execute CREATEFRAME instruction
+        """
         self.temporary_frame = []
 
     def ins_push_frame(self, ins):
+        """
+        Execute PUSHFRAME instruction
+        """
         if self.temporary_frame is None:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
             exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
@@ -152,12 +184,18 @@ class Interpret:
         self.temporary_frame = None
 
     def ins_pop_frame(self, ins):
+        """
+        Execute POPFRAME instruction
+        """
         if len(self.local_frame_stack) == 0:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
             exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
         self.temporary_frame = self.local_frame_stack.pop()
 
     def ins_defvar(self, ins):
+        """
+        Execute DEFVAR instruction
+        """
         frame, variable_name = ins.arg1[1].split("@")
         if frame == "GF":
             if any(variable["name"] == variable_name for variable in self.global_frame):
@@ -184,12 +222,64 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
+    def ins_call(self, ins):
+        """
+        Execute CALL instruction
+        """
+        pass
+
+    def ins_return(self, ins):
+        """
+        Execute RETURN instruction
+        """
+        pass
+
+    def ins_pushs(self, ins):
+        """
+        Execute PUSHS instruction
+        """
+        self.data_stack.append('todo')
+        pass
+
+    def ins_pops(self, ins):
+        """
+        Execute POPS instruction
+        """
+        pass
+
+    # todo more functions
+
+    def ins_write(self, ins):
+        """
+        Execute WRITE instruction
+        """
+        print(ins.arg1[1])  # todo finish
+
+    # todo more functions
+
+    def ins_label(self, ins):
+        """
+        Execute LABEL instruction
+        """
+        self.labels.append({"name": ins.arg1[1], "index": ins.real_order})
+
+    def ins_jump(self, ins):
+        """
+        Execute JUMP instruction
+        """
+        self.i = int(next(label for label in self.labels if label["name"] == ins.arg1[1])["index"]) - 1
+
 
 class Instruction:
-    
-    def __init__(self, instruction_element):
+    """
+    Encapsulates information of the instruction.
+    An instance should be created for each processed instruction.
+    """
+
+    def __init__(self, instruction_element, i):
         self.opcode = instruction_element.attrib['opcode']
         self.order = instruction_element.attrib['order']
+        self.real_order = i
         # arguments are tuples (type, value)
         arg_element = instruction_element.find("arg1")
         self.arg1 = (arg_element.attrib['type'], arg_element.text) if arg_element is not None else None
@@ -201,6 +291,7 @@ class Instruction:
         self.arg3 = (instruction_element.find("arg3"), arg_element.text) if arg_element is not None else None
 
     # todo lex and syn control
+
 
 interpret = Interpret()
 interpret.check_xml_structure()
