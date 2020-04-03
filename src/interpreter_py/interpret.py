@@ -3,6 +3,7 @@ import argparse
 import sys
 import re
 from exit_codes import ExitCodes as ec
+from operator import itemgetter
 
 
 class Interpret:
@@ -20,6 +21,7 @@ class Interpret:
             sys.stderr.write("Input XML not well formed\n")
             exit(ec.XML_NOT_WELL_FORMED_ERROR)
 
+        self.instructions = []
         self.temporary_frame = None
         self.local_frame_stack = []
         self.global_frame = []
@@ -107,35 +109,32 @@ class Interpret:
         Interpret source code.
         """
         print("--------RUN--------")
-        # print(self.root.tag) todo delete
-        # print(type(self.root.attrib))
-        # todo lexical and syntactival analysis
-        # sorted = self.root.
-        # f = itemgetter('order')
-        # for element in self.root:
-        #     print(f(element.attrib))
-        # sorted = self.root.findall('instruction').sort()
-        # print(f())
-        # parent = self.root
-        # attr = 'order'
-        try:
-            self.root[:] = sorted(self.root, key=lambda child: int(child.get('order')))  # todo check double value abd negative values
-        except ValueError:
-            sys.stderr.write("Order attribute value not valid\n")
-            exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-        # print(self.input_string)
         # interpretation body
         self.i = 0
-        while self.i < len(self.root):
-            element = self.root[self.i]
-            instruction = Instruction(element, self.i)
+        while self.i < len(self.instructions):
+            instruction = self.instructions[self.i]
             instruction_handler = self.instruction_swticher(instruction.opcode)
             instruction_handler(instruction)
             self.i += 1
             # todo jump to not discovered labels
 
         print("--------END--------")
+
+    def create_instructions_array(self):
+        for element in self.root:
+            self.instructions.append(Instruction(element))
+
+        self.instructions.sort(key=lambda x: x.order)
+
+        for i, ins in enumerate(self.instructions):
+            ins.real_order = i
+
+    def search_labels(self):
+        for i, ins in enumerate(self.instructions):
+            if ins.opcode == "LABEL":
+                self.labels.append({"name": ins.arg1[1], "index": ins.real_order})
+
 
     def instruction_swticher(self, opcode):
         """
@@ -259,9 +258,9 @@ class Interpret:
 
     def ins_label(self, ins):
         """
-        Execute LABEL instruction
+        Do nothing
         """
-        self.labels.append({"name": ins.arg1[1], "index": ins.real_order})
+        pass
 
     def ins_jump(self, ins):
         """
@@ -276,10 +275,15 @@ class Instruction:
     An instance should be created for each processed instruction.
     """
 
-    def __init__(self, instruction_element, i):
+    def __init__(self, instruction_element):
         self.opcode = instruction_element.attrib['opcode']
-        self.order = instruction_element.attrib['order']
-        self.real_order = i
+        
+        try:
+            self.order = int(instruction_element.attrib['order'])
+        except ValueError:
+            sys.stderr.write("Order attribute value not valid\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+        
         # arguments are tuples (type, value)
         arg_element = instruction_element.find("arg1")
         self.arg1 = (arg_element.attrib['type'], arg_element.text) if arg_element is not None else None
@@ -294,5 +298,9 @@ class Instruction:
 
 
 interpret = Interpret()
+interpret.create_instructions_array()
 interpret.check_xml_structure()
+interpret.search_labels()
 interpret.execute()
+
+# todo check double order and negative
