@@ -163,6 +163,10 @@ class Interpret:
             return self.ins_call
         elif opcode == "RETURN":
             return self.ins_return
+        elif opcode == "PUSHS":
+            return self.ins_pushs
+        elif opcode == "POPS":
+            return self.ins_pops
         elif opcode == "WRITE":
             return self.ins_write
         elif opcode == "LABEL":
@@ -288,14 +292,31 @@ class Interpret:
         """
         Execute PUSHS instruction
         """
-        self.data_stack.append('todo')
-        pass
+        if ins.arg1_type == "var":
+            frame, var_name = ins.arg1_value.split("@")
+            self.data_stack.append(self.frames[frame][var_name])
+        elif ins.arg1_type == "string":
+            self.data_stack.append(str(ins.arg1_value))
+        elif ins.arg1_type == "int":
+            self.data_stack.append(int(ins.arg1_value))
+        elif ins.arg1_type == "bool":
+            self.data_stack.append(True) if ins.arg1_value == "true" else self.data_stack.append(False)
+        elif ins.arg1_type == "nil":
+            self.data_stack.append((None, True))
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'.\n")
+            exit(ec.SEMANTIC_ERROR)
 
     def ins_pops(self, ins):
         """
         Execute POPS instruction
         """
-        pass
+        if self.data_stack:
+            frame, var_name = ins.arg1_value.split("@")
+            self.frames[frame][var_name] = self.data_stack.pop()
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Data stack is empty.\n")
+            exit(ec.RUNTIME_MISSING_VALUE_ERROR)
 
     # todo more functions
 
