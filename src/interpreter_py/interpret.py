@@ -22,11 +22,17 @@ class Interpret:
             exit(ec.XML_NOT_WELL_FORMED_ERROR)
 
         self.instructions = []
-        self.temporary_frame = None
+        # self.temporary_frame = None
         self.local_frame_stack = []
-        self.global_frame = []
+        # self.global_frame = dict()
         self.data_stack = []
-        self.labels = []
+        self.labels = dict()
+
+        self.frames = {
+            "GF": dict(),
+            "LF": None,
+            "TF": None
+        }
 
     def read_xml_source(self):
         """
@@ -133,8 +139,10 @@ class Interpret:
     def search_labels(self):
         for i, ins in enumerate(self.instructions):
             if ins.opcode == "LABEL":
-                self.labels.append({"name": ins.arg1[1], "index": ins.real_order})
-
+                if ins.arg1_value in self.labels:
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Cannot redefine label.\n")
+                    exit(ec.SEMANTIC_ERROR)
+                self.labels[ins.arg1_value] = ins.real_order
 
     def instruction_swticher(self, opcode):
         """
@@ -160,27 +168,44 @@ class Interpret:
             sys.stderr.write(f"Opcode {opcode} not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
+    # functions for instuction handling
+
     def ins_move(self, ins):
         """
         Execute MOVE instruction
         """
-        pass
+        dst_frame, dst_var_name = ins.arg1_value.split("@")
+        if ins.arg2_type == "var":
+            src_frame, src_var_name = ins.arg1_value.split("@")
+            self.frames[dst_frame][dst_var_name] = self.frames[src_frame][src_var_name]
+        elif ins.arg2_type == "string":
+            self.frames[dst_frame][dst_var_name] = str(ins.arg2_value)
+        elif ins.arg2_type == "int":
+            self.frames[dst_frame][dst_var_name] = int(ins.arg2_value)
+        elif ins.arg2_type == "bool":
+            self.frames[dst_frame][dst_var_name] = True if ins.arg2_value == "true" else False
+        elif ins.arg2_type == "nil":
+            self.frames[dst_frame][dst_var_name] = (None, True)
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'.\n")
+            exit(ec.SEMANTIC_ERROR)
 
     def ins_create_frame(self, ins):
         """
         Execute CREATEFRAME instruction
         """
-        self.temporary_frame = []
+        self.frames["TF"] = dict()
 
     def ins_push_frame(self, ins):
         """
         Execute PUSHFRAME instruction
         """
-        if self.temporary_frame is None:
+        if self.frames["TF"] is None:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
             exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
-        self.local_frame_stack.append(self.temporary_frame)
-        self.temporary_frame = None
+        self.local_frame_stack.append(self.frames["TF"])
+        self.frames["TF"] = None
+        self.frames["LF"] = self.local_frame_stack[-1]
 
     def ins_pop_frame(self, ins):
         """
@@ -189,37 +214,51 @@ class Interpret:
         if len(self.local_frame_stack) == 0:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
             exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
-        self.temporary_frame = self.local_frame_stack.pop()
+        self.frames["TF"] = self.local_frame_stack.pop()
+        if self.local_frame_stack:  # check if last local frame was popped
+            self.frames["LF"] = self.local_frame_stack[-1]
+        else:
+            self.frames["LF"] = None
 
     def ins_defvar(self, ins):
         """
         Execute DEFVAR instruction
         """
-        frame, variable_name = ins.arg1[1].split("@")
-        if frame == "GF":
-            if any(variable["name"] == variable_name for variable in self.global_frame):
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in global context.\n")
-                exit(ec.SEMANTIC_ERROR)
-            self.global_frame.append({"name": variable_name, "value": None})
-        elif frame == "LF":
-            if len(self.local_frame_stack) == 0:
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame not defined.\n")
-                exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
-            if any(variable["name"] == variable_name for variable in self.local_frame_stack[-1]):
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in local context.\n")
-                exit(ec.SEMANTIC_ERROR)
-            self.local_frame_stack[-1].append({"name": variable_name, "value": None})
-        elif frame == "TF":
-            if self.temporary_frame is None:
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
-                exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
-            if any(variable["name"] == variable_name for variable in self.temporary_frame):
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in temporary context.\n")
-                exit(ec.SEMANTIC_ERROR)
-            self.temporary_frame.append({"name": variable_name, "value": None})
-        else:
-            sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
-            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+        frame, variable_name = ins.arg1_value.split("@")
+
+        if self.frames[frame] is None:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Frame {frame} not defined.\n")
+            exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        if variable_name in self.frames[frame]:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in {frame}.\n")
+            exit(ec.SEMANTIC_ERROR)
+
+        self.frames[frame][variable_name] = (None, False)  # boolean value in tuple represents "defined"
+
+        # if frame == "GF":
+        #     if variable_name in self.global_frame:
+        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in global context.\n")
+        #         exit(ec.SEMANTIC_ERROR)
+        #     self.global_frame[variable_name] = None
+        # elif frame == "LF":
+        #     if len(self.local_frame_stack) == 0:
+        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame not defined.\n")
+        #         exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        #     if variable_name in self.local_frame_stack[-1]:
+        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in local context.\n")
+        #         exit(ec.SEMANTIC_ERROR)
+        #     self.local_frame_stack[-1][variable_name] = None
+        # elif frame == "TF":
+        #     if self.temporary_frame is None:
+        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
+        #         exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        #     if variable_name in self.temporary_frame:
+        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in temporary context.\n")
+        #         exit(ec.SEMANTIC_ERROR)
+        #     self.temporary_frame[variable_name] = None
+        # else:
+        #     sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
+        #     exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
     def ins_call(self, ins):
         """
@@ -252,13 +291,38 @@ class Interpret:
         """
         Execute WRITE instruction
         """
-        print(ins.arg1[1])  # todo finish
+        if ins.arg1_type == "var":  # variable
+            frame, var_name = ins.arg1_value.split("@")
+            try:
+                var_value = self.frames[frame][var_name]
+            except KeyError:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'\n")
+                exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
+
+            if type(var_value) is bool:
+                print("true", end='') if var_value else print("false", end='')
+            elif var_value == (None, True):
+                pass  # print nothing
+            elif var_value == (None, False):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{var_name}' was declared but not defined\n")
+                exit(ec.RUNTIME_MISSING_VALUE_ERROR)
+            else:
+                print(var_value, end='')
+        else:  # constant
+            const_type, const_value = ins.arg1_value.split("@")
+            if const_type in ["string", "int", "bool"]:
+                print(const_value)
+            elif const_type == "nil":
+                pass
+            else:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'\n")
+                exit(ec.SEMANTIC_ERROR)
 
     # todo more functions
 
     def ins_label(self, ins):
         """
-        Do nothing
+        Do nothing (labels are handled before the interpretation)
         """
         pass
 
@@ -266,7 +330,10 @@ class Interpret:
         """
         Execute JUMP instruction
         """
-        self.i = int(next(label for label in self.labels if label["name"] == ins.arg1[1])["index"]) - 1
+        if ins.arg1 not in self.labels:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Label not found.\n")
+            exit(ec.SEMANTIC_ERROR)
+        self.i = self.labels[ins.arg1] - 1
 
 
 class Instruction:
@@ -277,22 +344,37 @@ class Instruction:
 
     def __init__(self, instruction_element):
         self.opcode = instruction_element.attrib['opcode']
-        
+
         try:
             self.order = int(instruction_element.attrib['order'])
         except ValueError:
             sys.stderr.write("Order attribute value not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
-        
+
         # arguments are tuples (type, value)
         arg_element = instruction_element.find("arg1")
-        self.arg1 = (arg_element.attrib['type'], arg_element.text) if arg_element is not None else None
+        if arg_element is not None:
+            self.arg1_value = arg_element.text
+            self.arg1_type = arg_element.attrib['type']
+        else:
+            self.arg1_value = None
+            self.arg1_type = None
 
         arg_element = instruction_element.find("arg2")
-        self.arg2 = (instruction_element.find("arg2"), arg_element.text) if arg_element is not None else None
+        if arg_element is not None:
+            self.arg2_value = arg_element.text
+            self.arg2_type = arg_element.attrib['type']
+        else:
+            self.arg2_value = None
+            self.arg2_type = None
 
         arg_element = instruction_element.find("arg3")
-        self.arg3 = (instruction_element.find("arg3"), arg_element.text) if arg_element is not None else None
+        if arg_element is not None:
+            self.arg3_value = arg_element.text
+            self.arg3_type = arg_element.attrib['type']
+        else:
+            self.arg3_value = None
+            self.arg3_type = None
 
     # todo lex and syn control
 
