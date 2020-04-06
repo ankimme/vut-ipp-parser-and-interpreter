@@ -27,6 +27,7 @@ class Interpret:
         # self.global_frame = dict()
         self.data_stack = []
         self.labels = dict()
+        self.call_stack = []
 
         self.frames = {
             "GF": dict(),
@@ -158,12 +159,18 @@ class Interpret:
             return self.ins_pop_frame
         elif opcode == "DEFVAR":
             return self.ins_defvar
+        elif opcode == "CALL":
+            return self.ins_call
+        elif opcode == "RETURN":
+            return self.ins_return
         elif opcode == "WRITE":
             return self.ins_write
         elif opcode == "LABEL":
             return self.ins_label
         elif opcode == "JUMP":
             return self.ins_jump
+        elif opcode == "EXIT":
+            return self.ins_exit
         else:
             sys.stderr.write(f"Opcode {opcode} not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
@@ -264,13 +271,18 @@ class Interpret:
         """
         Execute CALL instruction
         """
-        pass
+        self.call_stack.append(self.i)
+        self.i = self.labels[ins.arg1_value]
 
     def ins_return(self, ins):
         """
         Execute RETURN instruction
         """
-        pass
+        if self.call_stack:
+            self.i = self.call_stack.pop()
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Call stack is empty.\n")
+            exit(ec.RUNTIME_MISSING_VALUE_ERROR)
 
     def ins_pushs(self, ins):
         """
@@ -296,7 +308,7 @@ class Interpret:
             try:
                 var_value = self.frames[frame][var_name]
             except KeyError:
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'\n")
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
                 exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
 
             if type(var_value) is bool:
@@ -304,18 +316,18 @@ class Interpret:
             elif var_value == (None, True):
                 pass  # print nothing
             elif var_value == (None, False):
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{var_name}' was declared but not defined\n")
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{var_name}' was declared but not defined.\n")
                 exit(ec.RUNTIME_MISSING_VALUE_ERROR)
             else:
                 print(var_value, end='')
         else:  # constant
-            const_type, const_value = ins.arg1_value.split("@")
+            const_type, const_value = ins.arg1_type, ins.arg1_value
             if const_type in ["string", "int", "bool"]:
-                print(const_value)
+                print(const_value, end='')
             elif const_type == "nil":
                 pass
             else:
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'\n")
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'.\n")
                 exit(ec.SEMANTIC_ERROR)
 
     # todo more functions
@@ -334,6 +346,13 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Label not found.\n")
             exit(ec.SEMANTIC_ERROR)
         self.i = self.labels[ins.arg1] - 1
+
+    def ins_exit(self, ins):
+        if ins.arg1_type == "int" and 0 <= int(ins.arg1_value) <= 49:
+            exit(int(ins.arg1_value))
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Exit code not valid.\n")
+            exit(ec.RUNTIME_OPERAND_VALUE_ERROR)
 
 
 class Instruction:
