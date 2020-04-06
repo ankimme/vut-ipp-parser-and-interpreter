@@ -292,7 +292,20 @@ class Interpret:
             exit(ec.RUNTIME_MISSING_VALUE_ERROR)
 
     def ins_math_operation(self, ins):
-        pass
+        frame, var_name = ins.arg1_value.split("@")
+        left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
+
+        if ins.opcode == "ADD":
+            result = left_operand + right_operand
+        elif ins.opcode == "SUB":
+            result = left_operand - right_operand
+        elif ins.opcode == "MUL":
+            result = left_operand * right_operand
+        else:
+            result = left_operand // right_operand
+
+        self.frames[frame][var_name] = result
 
     # todo more functions
 
