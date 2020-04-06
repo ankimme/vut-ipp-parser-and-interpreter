@@ -84,7 +84,7 @@ class Interpret:
 
     def check_xml_structure(self):
         """
-        Control 
+        Control
         """
         self.check_root_element()
         # todo check other stuff
@@ -110,6 +110,27 @@ class Interpret:
         if not ("language" in self.root.attrib and re.match("^ippcode20$", self.root.attrib["language"], re.I)):
             sys.stderr.write("Expected 'program' element attribute to be 'language=ippcode20'\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+    def extract_value_from_symbol(self, ins, symbol_type, symbol_value):
+        if symbol_type == "var":  # variable
+            frame, variable_name = symbol_value.split("@")
+            try:
+                var_value = self.frames[frame][variable_name]
+            except KeyError:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
+                exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
+            return var_value
+        elif symbol_type == "string":
+            return str(symbol_value)
+        if symbol_type == "int":
+            return int(symbol_value)
+        if symbol_type == "bool":
+            return True if symbol_value == "true" else False
+        elif symbol_type == "nil":
+            return (None, True)
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.const_type}'.\n")
+            exit(ec.SEMANTIC_ERROR)
 
     def execute(self):
         """
@@ -167,6 +188,8 @@ class Interpret:
             return self.ins_pushs
         elif opcode == "POPS":
             return self.ins_pops
+        elif opcode in ["ADD", "SUB", "MUL", "IDIV"]:
+            return self.ins_math_operation
         elif opcode == "WRITE":
             return self.ins_write
         elif opcode == "LABEL":
@@ -186,20 +209,7 @@ class Interpret:
         Execute MOVE instruction
         """
         dst_frame, dst_var_name = ins.arg1_value.split("@")
-        if ins.arg2_type == "var":
-            src_frame, src_var_name = ins.arg1_value.split("@")
-            self.frames[dst_frame][dst_var_name] = self.frames[src_frame][src_var_name]
-        elif ins.arg2_type == "string":
-            self.frames[dst_frame][dst_var_name] = str(ins.arg2_value)
-        elif ins.arg2_type == "int":
-            self.frames[dst_frame][dst_var_name] = int(ins.arg2_value)
-        elif ins.arg2_type == "bool":
-            self.frames[dst_frame][dst_var_name] = True if ins.arg2_value == "true" else False
-        elif ins.arg2_type == "nil":
-            self.frames[dst_frame][dst_var_name] = (None, True)
-        else:
-            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'.\n")
-            exit(ec.SEMANTIC_ERROR)
+        self.frames[dst_frame][dst_var_name] = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
 
     def ins_create_frame(self, ins):
         """
@@ -246,31 +256,6 @@ class Interpret:
 
         self.frames[frame][variable_name] = (None, False)  # boolean value in tuple represents "defined"
 
-        # if frame == "GF":
-        #     if variable_name in self.global_frame:
-        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in global context.\n")
-        #         exit(ec.SEMANTIC_ERROR)
-        #     self.global_frame[variable_name] = None
-        # elif frame == "LF":
-        #     if len(self.local_frame_stack) == 0:
-        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame not defined.\n")
-        #         exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
-        #     if variable_name in self.local_frame_stack[-1]:
-        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in local context.\n")
-        #         exit(ec.SEMANTIC_ERROR)
-        #     self.local_frame_stack[-1][variable_name] = None
-        # elif frame == "TF":
-        #     if self.temporary_frame is None:
-        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Temporary frame not defined.\n")
-        #         exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
-        #     if variable_name in self.temporary_frame:
-        #         sys.stderr.write(f"({ins.order}){ins.opcode}: Variable '{variable_name}' already exists in temporary context.\n")
-        #         exit(ec.SEMANTIC_ERROR)
-        #     self.temporary_frame[variable_name] = None
-        # else:
-        #     sys.stderr.write(f"({ins.order}){ins.opcode}: Local frame stack is empty.\n")
-        #     exit(ec.XML_WRONG_STRUCTURE_ERROR)
-
     def ins_call(self, ins):
         """
         Execute CALL instruction
@@ -292,20 +277,8 @@ class Interpret:
         """
         Execute PUSHS instruction
         """
-        if ins.arg1_type == "var":
-            frame, var_name = ins.arg1_value.split("@")
-            self.data_stack.append(self.frames[frame][var_name])
-        elif ins.arg1_type == "string":
-            self.data_stack.append(str(ins.arg1_value))
-        elif ins.arg1_type == "int":
-            self.data_stack.append(int(ins.arg1_value))
-        elif ins.arg1_type == "bool":
-            self.data_stack.append(True) if ins.arg1_value == "true" else self.data_stack.append(False)
-        elif ins.arg1_type == "nil":
-            self.data_stack.append((None, True))
-        else:
-            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'.\n")
-            exit(ec.SEMANTIC_ERROR)
+        pushed_value = self.extract_value_from_symbol(ins, ins.arg1_type, ins.arg1_value)
+        self.data_stack.append(pushed_value)
 
     def ins_pops(self, ins):
         """
@@ -317,6 +290,9 @@ class Interpret:
         else:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Data stack is empty.\n")
             exit(ec.RUNTIME_MISSING_VALUE_ERROR)
+
+    def ins_math_operation(self, ins):
+        pass
 
     # todo more functions
 
