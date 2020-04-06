@@ -116,8 +116,11 @@ class Interpret:
             frame, variable_name = symbol_value.split("@")
             try:
                 var_value = self.frames[frame][variable_name]
+                if var_value == (None, False):
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{variable_name}'.\n")
+                    exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
             except KeyError:
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{variable_name}'.\n")
                 exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
             return var_value
         elif symbol_type == "string":
@@ -129,7 +132,7 @@ class Interpret:
         elif symbol_type == "nil":
             return (None, True)
         else:
-            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.const_type}'.\n")
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{symbol_type}'.\n")
             exit(ec.SEMANTIC_ERROR)
 
     def execute(self):
@@ -188,8 +191,10 @@ class Interpret:
             return self.ins_pushs
         elif opcode == "POPS":
             return self.ins_pops
-        elif opcode in ["ADD", "SUB", "MUL", "IDIV"]:
-            return self.ins_math_operation
+        elif opcode in ["ADD", "SUB", "MUL", "IDIV", "LT", "GT", "EQ", "AND", "OR"]:
+            return self.ins_math_or_logical_operation
+        elif opcode == "NOT":
+            return self.ins_not
         elif opcode == "WRITE":
             return self.ins_write
         elif opcode == "LABEL":
@@ -291,10 +296,27 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Data stack is empty.\n")
             exit(ec.RUNTIME_MISSING_VALUE_ERROR)
 
-    def ins_math_operation(self, ins):
+    def ins_math_or_logical_operation(self, ins):
         frame, var_name = ins.arg1_value.split("@")
         left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
+
+        # data type control
+        if ins.opcode in ["ADD", "SUB", "MUL", "IDIV"]:
+            if not all(type(x) == int for x in [left_operand, right_operand]):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: All operands must be integers.\n")
+                exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+        if ins.opcode in ["LT", "GT"]:
+            if (None, True) in [left_operand, right_operand]:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Cannot compare nil value.\n")
+                exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+            if type(left_operand) != type(right_operand):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Cannot compare values of different types.\n")
+                exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+        if ins.opcode in ["AND", "OR"]:
+            if not all(type(x) == bool for x in [left_operand, right_operand]):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Values must be of bool type.\n")
+                exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
         if ins.opcode == "ADD":
             result = left_operand + right_operand
@@ -302,11 +324,39 @@ class Interpret:
             result = left_operand - right_operand
         elif ins.opcode == "MUL":
             result = left_operand * right_operand
-        else:
+        elif ins.opcode == "IDIV":
+            if right_operand == 0:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Division by zero.\n")
+                exit(ec.RUNTIME_OPERAND_VALUE_ERROR)
             result = left_operand // right_operand
+        elif ins.opcode == "LT":
+            result = left_operand < right_operand
+        elif ins.opcode == "GT":
+            result = left_operand > right_operand
+        elif ins.opcode == "EQ":
+            if all(x == (None, True) for x in [left_operand, right_operand]):  # nil = nil
+                result = True
+            if any(x == (None, True) for x in [left_operand, right_operand]):  # nil != other data types
+                result = False
+            else:
+                if type(left_operand) != type(right_operand):
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Cannot compare values of different types.\n")
+                    exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+                result = left_operand == right_operand
+        elif ins.opcode == "AND":
+            result = left_operand and right_operand
+        elif ins.opcode == "OR":
+            result = left_operand or right_operand
 
         self.frames[frame][var_name] = result
 
+    def ins_not(self, ins):
+        frame, var_name = ins.arg1_value.split("@")
+        symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        if type(symbol_value) != bool:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Value must be of bool type.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+        self.frames[frame][var_name] = not symbol_value
     # todo more functions
 
     def ins_write(self, ins):
