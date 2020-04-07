@@ -193,24 +193,36 @@ class Interpret:
             return self.ins_pushs
         elif opcode == "POPS":
             return self.ins_pops
-        elif opcode in ["ADD", "SUB", "MUL", "IDIV", "LT", "GT", "EQ", "AND", "OR"]:
+        elif opcode in ["ADD", "SUB", "MUL", "IDIV", "LT", "GT", "EQ", "AND", "OR", "CONCAT"]:
             return self.ins_math_or_logical_operation
         elif opcode == "NOT":
             return self.ins_not
         elif opcode == "INT2CHAR":
             return self.ins_int2char
-        elif opcode == "STRI2INT":
-            return self.ins_stri2int
+        elif opcode in ["STRI2INT", "GETCHAR"]:
+            return self.ins_stri2int_getchar
         elif opcode == "READ":
             return self.ins_read
         elif opcode == "WRITE":
             return self.ins_write
+        elif opcode == "STRLEN":
+            return self.ins_strlen
+        elif opcode == "SETCHAR":
+            return self.ins_setchar
+        elif opcode == "TYPE":
+            return self.ins_type
         elif opcode == "LABEL":
             return self.ins_label
         elif opcode == "JUMP":
             return self.ins_jump
+        elif opcode in ["JUMPIFEQ", "JUMPIFNEQ"]:
+            return self.ins_jump_on_condition
         elif opcode == "EXIT":
             return self.ins_exit
+        elif opcode == "DPRINT":
+            return self.ins_dprint
+        elif opcode == "BREAK":
+            return self.ins_break
         else:
             sys.stderr.write(f"Opcode {opcode} not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
@@ -325,8 +337,12 @@ class Interpret:
             if not all(type(x) == bool for x in [left_operand, right_operand]):
                 sys.stderr.write(f"({ins.order}){ins.opcode}: Values must be of bool type.\n")
                 exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+        if ins.opcode == "CONCAT":
+            if not all(type(x) == str for x in [left_operand, right_operand]):
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Values must be of string type.\n")
+                exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
-        if ins.opcode == "ADD":
+        if ins.opcode in ["ADD", "CONCAT"]:
             result = left_operand + right_operand
         elif ins.opcode == "SUB":
             result = left_operand - right_operand
@@ -379,7 +395,7 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value not in Unicode range.\n")
             exit(ec.RUNTIME_STRING_ERROR)
 
-    def ins_stri2int(self, ins):
+    def ins_stri2int_getchar(self, ins):
         frame, var_name = ins.arg1_value.split("@")
         left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
@@ -389,7 +405,10 @@ class Interpret:
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
         try:
-            self.frames[frame][var_name] = ord(left_operand[right_operand])
+            if ins.opcode == "STRI2INT":
+                self.frames[frame][var_name] = ord(left_operand[right_operand])
+            else:
+                self.frames[frame][var_name] = left_operand[right_operand]
         except IndexError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Index out of boundaries.\n")
             exit(ec.RUNTIME_STRING_ERROR)
@@ -440,7 +459,11 @@ class Interpret:
                 print(var_value, end='')
         else:  # constant
             const_type, const_value = ins.arg1_type, ins.arg1_value
-            if const_type in ["string", "int", "bool"]:
+            if const_type in ["int", "bool"]:
+                print(const_value, end='')
+            elif const_type == "string":
+                for x in list(range(33)) + [35, 92]:
+                    const_value = const_value.replace("\\0" + str(x).zfill(2), chr(x))
                 print(const_value, end='')
             elif const_type == "nil":
                 pass
@@ -448,7 +471,47 @@ class Interpret:
                 sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type '{ins.arg2_type}'.\n")
                 exit(ec.SEMANTIC_ERROR)
 
-    # todo more functions
+    def ins_strlen(self, ins):
+        frame, var_name = ins.arg1_value.split("@")
+        symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+
+        if type(symbol_value) != str:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Operand must be string.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+
+        self.frames[frame][var_name] = len(symbol_value)
+
+    def ins_setchar(self, ins):
+        frame, var_name = ins.arg1_value.split("@")
+        left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
+
+        if type(left_operand) != int or type(right_operand) != str:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong operand type.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+
+        try:
+            old_value = self.frames[frame][var_name]
+            new_value = old_value[0:left_operand] + right_operand[0] + old_value[left_operand + 1:]
+            self.frames[frame][var_name] = new_value
+        except IndexError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Ivalid string.\n")
+            exit(ec.RUNTIME_STRING_ERROR)
+
+    def ins_type(self, ins):
+        frame, var_name = ins.arg1_value.split("@")
+        symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+
+        if type(symbol_value) == str:
+            self.frames[frame][var_name] = "string"
+        elif type(symbol_value) == int:
+            self.frames[frame][var_name] = "int"
+        elif type(symbol_value) == bool:
+            self.frames[frame][var_name] = "bool"
+        elif symbol_value == (None, True):
+            self.frames[frame][var_name] = "nil"
+        else:
+            self.frames[frame][var_name] = ""
 
     def ins_label(self, ins):
         """
@@ -460,10 +523,37 @@ class Interpret:
         """
         Execute JUMP instruction
         """
-        if ins.arg1 not in self.labels:
+        if ins.arg1_value not in self.labels:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Label not found.\n")
             exit(ec.SEMANTIC_ERROR)
-        self.i = self.labels[ins.arg1] - 1
+        self.i = self.labels[ins.arg1_value] - 1
+
+    def ins_jump_on_condition(self, ins):
+        """
+        Execute JUMPIFEQ and JUMPIFNEQ instructions
+        """
+        if ins.arg1_value not in self.labels:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Label not found.\n")
+            exit(ec.SEMANTIC_ERROR)
+        left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
+
+        if left_operand == right_operand == (None, True):
+            equality = True
+        elif (None, True) in [left_operand, right_operand]:
+            equality = False
+        elif type(left_operand) == type(right_operand):
+            equality = left_operand == right_operand
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong value type.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+
+        if (ins.opcode == "JUMPIFEQ"):
+            if equality:
+                self.i = self.labels[ins.arg1_value] - 1
+        else:  # JUMPIFNEQ
+            if not equality:
+                self.i = self.labels[ins.arg1_value] - 1
 
     def ins_exit(self, ins):
         if ins.arg1_type == "int" and 0 <= int(ins.arg1_value) <= 49:
@@ -471,6 +561,18 @@ class Interpret:
         else:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Exit code not valid.\n")
             exit(ec.RUNTIME_OPERAND_VALUE_ERROR)
+
+    def ins_dprint(self, ins):
+        symbol_value = self.extract_value_from_symbol(ins, ins.arg1_type, ins.arg1_value)
+        sys.stderr.write(str(symbol_value))
+
+    def ins_break(self, ins):
+        sys.stderr.write(f"Inner instruction counter: {self.i}\n")
+        sys.stderr.write(f"Total local frames: {len(self.local_frame_stack)}\n")
+        sys.stderr.write(f"Data stack: {self.data_stack}\n")
+        sys.stderr.write(f"GF: {self.frames['GF']}\n")
+        sys.stderr.write(f"LF: {self.frames['LF']}\n")
+        sys.stderr.write(f"TF: {self.frames['TF']}\n")
 
 
 class Instruction:
