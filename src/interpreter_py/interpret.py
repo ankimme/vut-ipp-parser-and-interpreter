@@ -195,6 +195,10 @@ class Interpret:
             return self.ins_math_or_logical_operation
         elif opcode == "NOT":
             return self.ins_not
+        elif opcode == "INT2CHAR":
+            return self.ins_int2char
+        elif opcode == "STRI2INT":
+            return self.ins_stri2int
         elif opcode == "WRITE":
             return self.ins_write
         elif opcode == "LABEL":
@@ -357,7 +361,34 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value must be of bool type.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
         self.frames[frame][var_name] = not symbol_value
-    # todo more functions
+
+    def ins_int2char(self, ins):
+        symb_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        frame, var_name = ins.arg1_value.split("@")
+
+        try:
+            self.frames[frame][var_name] = chr(symb_value)
+        except TypeError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Value must be integer.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+        except ValueError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Value not in Unicode range.\n")
+            exit(ec.RUNTIME_STRING_ERROR)
+
+    def ins_stri2int(self, ins):
+        frame, var_name = ins.arg1_value.split("@")
+        left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
+
+        if type(left_operand) != str or type(right_operand) != int:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong value type.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+
+        try:
+            self.frames[frame][var_name] = ord(left_operand[right_operand])
+        except IndexError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Index out of boundaries.\n")
+            exit(ec.RUNTIME_STRING_ERROR)
 
     def ins_write(self, ins):
         """
