@@ -13,7 +13,7 @@ class Interpret:
         if (self.arguments.source == self.arguments.input):
             sys.stderr.write("Invalid arguments\n")
             exit(ec.ARGUMENT_ERROR)
-        self.input_string = self.read_input()
+        self.input_list = self.read_input()
         xml_string = self.read_xml_source()
         try:
             self.root = ET.fromstring(xml_string)
@@ -53,19 +53,19 @@ class Interpret:
 
     def read_input(self):
         """
-        Read input file or stdin, based on arguments given to the script
-        Returns a string representation of the input data
+        Read input file and return a list of lines of the input data
         """
         if self.arguments.input:
             try:
                 with open(self.arguments.input, 'r') as source:
-                    input_string = source.read()
+                    input_list = source.readlines()
+                input_list.reverse()
             except FileNotFoundError:
                 sys.stderr.write(f"Input file '{self.arguments.input}' not found\n")
                 exit(ec.INPUT_FILE_ERROR)
         else:
-            input_string = sys.stdin.read()
-        return input_string
+            input_list = None
+        return input_list
 
     def process_arguments(self):
         """
@@ -199,6 +199,8 @@ class Interpret:
             return self.ins_int2char
         elif opcode == "STRI2INT":
             return self.ins_stri2int
+        elif opcode == "READ":
+            return self.ins_read
         elif opcode == "WRITE":
             return self.ins_write
         elif opcode == "LABEL":
@@ -389,6 +391,29 @@ class Interpret:
         except IndexError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Index out of boundaries.\n")
             exit(ec.RUNTIME_STRING_ERROR)
+
+    def ins_read(self, ins):
+        frame, var_name = ins.arg1_value.split("@")
+
+        if self.arguments.input:
+            input_value = self.input_list.pop().strip()
+        else:
+            input_value = input()
+
+        if ins.arg2_value == "string":
+            result = input_value
+        elif ins.arg2_value == "int":
+            try:
+                result = int(input_value)
+            except ValueError:
+                result = (None, False)
+        elif ins.arg2_value == "bool":
+            result = bool(re.match("^true$", input_value, re.IGNORECASE))
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type.\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+        self.frames[frame][var_name] = result
 
     def ins_write(self, ins):
         """
