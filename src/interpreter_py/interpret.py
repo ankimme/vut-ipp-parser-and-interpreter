@@ -124,7 +124,9 @@ class Interpret:
                 exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
             return var_value
         elif symbol_type == "string":
-            return str(symbol_value)
+            for x in list(range(33)) + [35, 92]:
+                symbol_value = symbol_value.replace("\\0" + str(x).zfill(2), chr(x))
+            return symbol_value
         if symbol_type == "int":
             return int(symbol_value)
         if symbol_type == "bool":
