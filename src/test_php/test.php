@@ -32,7 +32,16 @@
     {
         if (count($options) == 1)
         {
-            echo "napoveda\n"; // TODO finish help
+            echo "This script is used to test the functionality of interpret.py and parse.php scripts.\n\n";
+            echo "Usage: test.php [-h] [--direcotry DIRECTORY] [--recursive] [--parse-script FILE] [--int-script FILE] [--parse-only] [--int-only] [--jexamxml FILE] \n\n";
+            echo str_pad("    -h, --help:", 30, " ", STR_PAD_RIGHT) . "show help message\n";
+            echo str_pad("    --direcotry DIRECTORY:", 30, " ", STR_PAD_RIGHT) . "path to directory with test files\n";
+            echo str_pad("    --recursive:", 30, " ", STR_PAD_RIGHT) . "enables recursive search of test files in subdirectories\n";
+            echo str_pad("    --parse-script FILE:", 30, " ", STR_PAD_RIGHT) . "path of parse.php script\n";
+            echo str_pad("    --int-script FILE:", 30, " ", STR_PAD_RIGHT) . "path of interpret.py script\n";
+            echo str_pad("    --parse-only:", 30, " ", STR_PAD_RIGHT) . "test only parse.php functionality\n";
+            echo str_pad("    --int-only:", 30, " ", STR_PAD_RIGHT) . "test only interpret.py functionality\n";
+            echo str_pad("    --jexamxml FILE:", 30, " ", STR_PAD_RIGHT) . "path to jexamxml jar file\n";
             exit(ExitCodesEnum::Success);
         }
         else
