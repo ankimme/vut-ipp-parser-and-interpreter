@@ -2,25 +2,67 @@
 
 <?php
 
-    function run_parser_test($parse_script, $src_file, $out_file, $rc_file)
+    // function run_parser_test($parse_script, $src_file, $out_file, $rc_file)
+    // {
+    //     $shell_out = shell_exec('php7.4 ' . $parse_script . ' < ' . $src_file);
+
+    //     $test_passed = true;
+
+    //     // java -jar /pub/courses/ipp/jexamxml/jexamxml.jar test.out test.your_out diffs.xml  /D /pub/courses/ipp/jexamxml/options NAVRATOVA_HODNOTA="$?"
+
+
+    //     return $test_passed;
+    // }
+
+
+    // function change_file_extension($filename, $new_extension)
+    // {
+    //     $info = pathinfo($filename);
+    //     return $info['dirname'] . '/' . $info['filename'] . '.' . $new_extension;
+
+    // }
+
+    interface Tester
     {
-        $shell_out = shell_exec('php7.4 ' . $parse_script . ' < ' . $src_file);
-
-        $test_passed = true;
-
-        // java -jar /pub/courses/ipp/jexamxml/jexamxml.jar test.out test.your_out diffs.xml  /D /pub/courses/ipp/jexamxml/options NAVRATOVA_HODNOTA="$?"
-
-
-        return $test_passed;
+        public function run_test_file($file_path);
     }
 
-
-    function change_file_extension($filename, $new_extension)
+    class ParseOnlyTester implements Tester
     {
-        $info = pathinfo($filename);
-        return $info['dirname'] . '/' . $info['filename'] . '.' . $new_extension;
-
+        // $file_path - path of test file, must not contain extension of file
+        public function run_test_file($file_path)
+        {
+            return "Par" . $file_path;
+        }
     }
+
+    class IntOnlyTester implements Tester
+    {
+        // $file_path - path of test file, must not contain extension of file
+        public function run_test_file($file_path)
+        {
+            return "Int" . $file_path;
+        }
+    }
+
+    class BothTester implements Tester
+    {
+        // $file_path - path of test file, must not contain extension of file
+        public function run_test_file($file_path)
+        {
+            return "Both" . $file_path;
+        }
+    }
+
+    class TestResult
+    {
+        public $rc_parse_real;
+        public $rc_parse_expected;
+        public $rc_int_real;
+        public $rc_int_expected;
+        public $result; // bool
+    }
+
 
     require_once 'exitCodes.php';
 
@@ -130,46 +172,26 @@
     echo "interpret:" . $interpret_script . "\n";
     echo "jexamxml:" . $jexamxml . "\n\n";
     // todo delete
-    
-    
-
-    /* recursive dir todo
-    $directory = new RecursiveDirectoryIterator($test_directory);
-    $iterator = new RecursiveIteratorIterator($directory);
-    $regex = new RegexIterator($iterator, '~^.+\.src$~i', RecursiveRegexIterator::GET_MATCH);
-
-    var_dump($regex);
-    var_dump($iterator);
-
-
-    foreach ($regex as $file)
-    {
-        echo $file->
-        var_dump($file);
-    }
-    // function getSrcFiles
-    */
-    // $src_file = array();
 
     $test_files_list = array();
     // create list of test files (without extenstion)
-    foreach (glob($test_directory . '/*.src') as $src_file)
+    function create_file_list($test_directory, &$output_array, $recursive)
     {
-        // echo $src_file . "\n"; // todo delete
-
-        // $out_file = change_file_extension($src_file, 'out');
-        // $rc_file = change_file_extension($src_file, 'rc');
-
-        // echo $src_file . "\n";
-        // echo $out_file . "\n";
-        // echo $rc_file . "\n";
-
-        // $test_passed = run_parser_test($parse_script, $src_file, $out_file, $rc_file);
-        // echo basename($src_file) . ": " . $test_passed . "\n";
-        $path_parts = pathinfo($src_file);
-        array_push($test_files_list, $path_parts['dirname'] . '/' . $path_parts['filename']);
+        if ($recursive)
+        {
+            foreach (glob($test_directory . "/*", GLOB_ONLYDIR) as $directory)
+            {
+                create_file_list($directory, $output_array, $recursive);
+            }
+        }
+        foreach (glob($test_directory . '/*.src') as $src_file)
+        {
+            $path_parts = pathinfo($src_file);
+            array_push($output_array, $path_parts['dirname'] . '/' . $path_parts['filename']);
+        }
     }
 
+    create_file_list($test_directory, $test_files_list, $recursive);
 
     // generate IN, OUT, RC if not existing already
     foreach ($test_files_list as $file)
@@ -211,5 +233,25 @@
             fwrite($f, "0");
             fclose($f);
         }
+    }
+
+    if ($parse_only)
+    {
+        $tester = new ParseOnlyTester();
+    }
+    elseif ($int_only)
+    {
+        $tester = new IntOnlyTester();
+    }
+    else
+    {
+        $tester = new BothTester();
+    }
+
+
+    foreach ($test_files_list as $file)
+    {
+        $test_result = $tester->run_test_file($file);
+        echo $test_result . "\n"; delt
     }
 ?>
