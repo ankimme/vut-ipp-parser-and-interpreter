@@ -25,17 +25,16 @@
     require_once 'exitCodes.php';
 
     $options = getopt("h", ["help", "directory:", "recursive", "parse-script::", "int-script::", "parse-only", "int-only", "jexamxml::"]);
-
     
-    // process --help argument
+    // process --help argument and stop execution
     if (array_key_exists("help", $options) || array_key_exists("h", $options))
     {
         if (count($options) == 1)
         {
             echo "This script is used to test the functionality of interpret.py and parse.php scripts.\n\n";
-            echo "Usage: test.php [-h] [--direcotry DIRECTORY] [--recursive] [--parse-script FILE] [--int-script FILE] [--parse-only] [--int-only] [--jexamxml FILE] \n\n";
+            echo "Usage: test.php [-h] [--directory DIRECTORY] [--recursive] [--parse-script FILE] [--int-script FILE] [--parse-only] [--int-only] [--jexamxml FILE] \n\n";
             echo str_pad("    -h, --help:", 30, " ", STR_PAD_RIGHT) . "show help message\n";
-            echo str_pad("    --direcotry DIRECTORY:", 30, " ", STR_PAD_RIGHT) . "path to directory with test files\n";
+            echo str_pad("    --directory DIRECTORY:", 30, " ", STR_PAD_RIGHT) . "path to directory with test files\n";
             echo str_pad("    --recursive:", 30, " ", STR_PAD_RIGHT) . "enables recursive search of test files in subdirectories\n";
             echo str_pad("    --parse-script FILE:", 30, " ", STR_PAD_RIGHT) . "path of parse.php script\n";
             echo str_pad("    --int-script FILE:", 30, " ", STR_PAD_RIGHT) . "path of interpret.py script\n";
@@ -51,11 +50,10 @@
         }
     }
 
-
-    // process --directory argument
+    // process --directory argument and stop execution if path not valid
     if (array_key_exists("directory", $options))
     {
-        if (file_exists($options['directory'])) // todo and is really a directory
+        if (is_dir($options['directory']))
         {
             $test_directory = $options['directory'];
         }
@@ -73,54 +71,9 @@
     // process --recursive argument
     $recursive = array_key_exists("recursive", $options);
     
-    // process --recursive argument
-    // if (array_key_exists("parse-script", $options))
-    // {
-    //     if (file_exists($options['parse-script']))
-    //     {
-    //         $parse_script = $options['parse-script'];
-    //     }
-    //     else
-    //     {
-    //         fwrite(STDERR, "Parse script not found\n");
-    //         exit(ExitCodesEnum::InputFileError);   
-    //     }
-    // }
-
-    // process --parse-script argument
-    $parse_script = array_key_exists("parse-script", $options) ? $options['parse-script'] : 'parse.php';
-    // if (!file_exists($parse_script))
-    // {
-    //     fwrite(STDERR, "Parse script not found\n");
-    //     exit(ExitCodesEnum::InputFileError);   
-    // }
-
-    // process --int-script argument
-    $interpret_script = array_key_exists("int-script", $options) ? $options['int-script'] : 'interpret.py';
-    // if (!file_exists($interpret_script))
-    // {
-    //     fwrite(STDERR, "Interpret script not found\n");
-    //     exit(ExitCodesEnum::InputFileError);   
-    // }
-
-    // var_dump($options);
-    //test directory
-    // if ($handle = opendir($test_directory)) {
-
-    //     while (false !== ($entry = readdir($handle))) {
-    
-    //         if ($entry != "." && $entry != "..") {
-    
-    //             echo "$entry\n";
-    //         }
-    //     }
-    
-    //     closedir($handle);
-    // }
-
-    // process --parse-only and --int-only
+    // process --parse-only and --int-only and check wrong argument combination
     $parse_only = array_key_exists("parse-only", $options);
-    $int_only = array_key_exists("parse-only", $options);
+    $int_only = array_key_exists("int-only", $options);
     if ($parse_only)
     {
         if ($int_only || array_key_exists("int-script", $options))
@@ -138,10 +91,41 @@
         }
     }
 
+    // process --parse-script argument and stop execution if file does not exist
+    if (!$int_only)
+    {
+        $parse_script = array_key_exists("parse-script", $options) ? $options['parse-script'] : 'parse.php';
+        if (!is_file($parse_script))
+        {
+            fwrite(STDERR, "Parse script not found\n");
+            exit(ExitCodesEnum::InputFileError);   
+        }
+    }
+    else
+    {
+        $parse_script = false;
+    }
+
+    // process --int-script argument
+    if (!$parse_only)
+    {
+        $interpret_script = array_key_exists("int-script", $options) ? $options['int-script'] : 'interpret.py';
+        if (!is_file($interpret_script))
+        {
+            fwrite(STDERR, "Interpret script not found\n");
+            exit(ExitCodesEnum::InputFileError);   
+        }
+    }
+    else
+    {
+        $interpret_script = false;
+    }
+
     // process --jexamxml
     $jexamxml = array_key_exists("jexamxml", $options) ? $options['jexamxml'] : '/pub/courses/ipp/jexamxml/jexamxml.jar';
 
     echo "test dir:" . $test_directory . "\n";
+    print sprintf("recursive: %b", $recursive) . "\n";
     echo "parser:" . $parse_script . "\n";
     echo "interpret:" . $interpret_script . "\n";
     echo "jexamxml:" . $jexamxml . "\n\n";
@@ -165,22 +149,67 @@
     }
     // function getSrcFiles
     */
-
     // $src_file = array();
+
+    $test_files_list = array();
+    // create list of test files (without extenstion)
     foreach (glob($test_directory . '/*.src') as $src_file)
     {
         // echo $src_file . "\n"; // todo delete
 
-        $out_file = change_file_extension($src_file, 'out');
-        $rc_file = change_file_extension($src_file, 'rc');
+        // $out_file = change_file_extension($src_file, 'out');
+        // $rc_file = change_file_extension($src_file, 'rc');
 
         // echo $src_file . "\n";
         // echo $out_file . "\n";
         // echo $rc_file . "\n";
 
-        $test_passed = run_parser_test($parse_script, $src_file, $out_file, $rc_file);
-        echo basename($src_file) . ": " . $test_passed . "\n";
+        // $test_passed = run_parser_test($parse_script, $src_file, $out_file, $rc_file);
+        // echo basename($src_file) . ": " . $test_passed . "\n";
+        $path_parts = pathinfo($src_file);
+        array_push($test_files_list, $path_parts['dirname'] . '/' . $path_parts['filename']);
     }
-    
-    echo "done\n"; // todo delete
+
+
+    // generate IN, OUT, RC if not existing already
+    foreach ($test_files_list as $file)
+    {
+        $in_file = $file . '.in';
+        $out_file = $file . '.out';
+        $rc_file = $file . '.rc';
+        
+        if (!is_file($in_file))
+        {
+            $f = fopen($in_file, "w");
+            if (!$f)
+            {
+                fwrite(STDERR, "Could not create file\n");
+                exit(ExitCodesEnum::OutputFileError);
+            }
+            fclose($f);
+        }
+
+        if (!is_file($out_file))
+        {
+            $f = fopen($out_file, "w");
+            if (!$f)
+            {
+                fwrite(STDERR, "Could not create file\n");
+                exit(ExitCodesEnum::OutputFileError);
+            }
+            fclose($f);
+        }
+
+        if (!is_file($rc_file))
+        {
+            $f = fopen($rc_file, "w");
+            if (!$f)
+            {
+                fwrite(STDERR, "Could not create file\n");
+                exit(ExitCodesEnum::OutputFileError);
+            }
+            fwrite($f, "0");
+            fclose($f);
+        }
+    }
 ?>
