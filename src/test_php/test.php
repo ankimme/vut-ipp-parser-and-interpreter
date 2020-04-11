@@ -2,26 +2,6 @@
 
 <?php
 
-    // function run_parser_test($parse_script, $src_file, $out_file, $rc_file)
-    // {
-    //     $shell_out = shell_exec('php7.4 ' . $parse_script . ' < ' . $src_file);
-
-    //     $test_passed = true;
-
-    //     // java -jar /pub/courses/ipp/jexamxml/jexamxml.jar test.out test.your_out diffs.xml  /D /pub/courses/ipp/jexamxml/options NAVRATOVA_HODNOTA="$?"
-
-
-    //     return $test_passed;
-    // }
-
-
-    // function change_file_extension($filename, $new_extension)
-    // {
-    //     $info = pathinfo($filename);
-    //     return $info['dirname'] . '/' . $info['filename'] . '.' . $new_extension;
-
-    // }
-
     interface Tester
     {
         public function run_test_file($file_path);
@@ -29,38 +9,237 @@
 
     class ParseOnlyTester implements Tester
     {
+        function __construct($parse_script, $jexamxml) {
+            $this->parse_script = $parse_script;
+            $this->jexamxml = $jexamxml;
+        }
+
+        public $test_mode = "Parser only";
+
         // $file_path - path of test file, must not contain extension of file
         public function run_test_file($file_path)
         {
-            return "Par" . $file_path;
+            $test_result = new TestResult();
+            $test_result->test_file = $file_path;
+
+            $src_file_path = $file_path . ".src";
+            $rc_file_path = $file_path . ".rc";
+            $out_file_path = $file_path . ".out";
+            $real_out_file_path = $file_path . ".real_out";
+
+            $test_result->expected_rc = file_get_contents($rc_file_path);
+
+            exec('php7.4 ' . $this->parse_script . ' < ' . $src_file_path . ' > ' . $real_out_file_path, $dev_null, $test_result->real_rc);
+            
+            if ($test_result->expected_rc == '0')
+            {
+                if ($test_result->real_rc == '0')
+                {
+                    $delta_file_path = $file_path . ".delta";
+                    exec("java -jar $this->jexamxml $real_out_file_path $out_file_path $delta_file_path", $jexamsml_output, $jexamxml_rc);
+                    // todo uncomment !!!
+                    // exec("java -jar $this->jexamxml $real_out_file_path $out_file_path $delta_file_path /pub/courses/ipp/jexamxml/options", $jexamsml_output, $jexamxml_rc);
+                    unlink($delta_file_path);
+                    if ($jexamxml_rc == 0)
+                    {
+                        $test_result->comparison = 1;
+                        $test_result->test_ok = true;
+                    }
+                    else
+                    {
+                        $test_result->comparison = -1;
+                        $test_result->test_ok = false;
+                    }
+                }
+                else
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = false;
+                } 
+            }
+            else
+            {
+                if ($test_result->real_rc == $test_result->expected_rc)
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = true;
+                }
+                else
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = false;
+                }
+            }
+
+            unlink($real_out_file_path);
+            return $test_result;
         }
     }
 
     class IntOnlyTester implements Tester
     {
+        function __construct($int_script, $jexamxml) {
+            $this->int_script = $int_script;
+            $this->jexamxml = $jexamxml;
+        }
+
+        public $test_mode = "Interpret only";
+
         // $file_path - path of test file, must not contain extension of file
         public function run_test_file($file_path)
         {
-            return "Int" . $file_path;
+            $test_result = new TestResult();
+            $test_result->test_file = $file_path;
+
+            $src_file_path = $file_path . ".src";
+            $rc_file_path = $file_path . ".rc";
+            $in_file_path = $file_path . ".in";
+            $out_file_path = $file_path . ".out";
+            $real_out_file_path = $file_path . ".real_out";
+
+            $test_result->expected_rc = file_get_contents($rc_file_path);
+
+            exec('python3.8 ' . $this->int_script . ' --input=' . $in_file_path . ' --source=' . $src_file_path . ' > ' . $real_out_file_path, $dev_null, $test_result->real_rc);
+
+
+            if ($test_result->expected_rc == '0')
+            {
+                if ($test_result->real_rc == '0')
+                {
+                    exec("diff $real_out_file_path $out_file_path", $dev_null, $diff_rc);
+
+                    if ($diff_rc == 0)
+                    {
+                        $test_result->comparison = 1;
+                        $test_result->test_ok = true;
+                    }
+                    else
+                    {
+                        $test_result->comparison = -1;
+                        $test_result->test_ok = false;
+                    }
+                }
+                else
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = false;
+                } 
+            }
+            else
+            {
+                if ($test_result->real_rc == $test_result->expected_rc)
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = true;
+                }
+                else
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = false;
+                }
+            }
+
+            unlink($real_out_file_path);
+            return $test_result;
         }
     }
 
     class BothTester implements Tester
     {
+        function __construct($parse_script, $int_script, $jexamxml) {
+            $this->parse_script = $parse_script;
+            $this->int_script = $int_script;
+            $this->jexamxml = $jexamxml;
+        }
+
+        public $test_mode = "Both";
+
         // $file_path - path of test file, must not contain extension of file
         public function run_test_file($file_path)
         {
-            return "Both" . $file_path;
+            $test_result = new TestResult();
+            $test_result->test_file = $file_path;
+
+            $src_file_path = $file_path . ".src";
+            $rc_file_path = $file_path . ".rc";
+            $in_file_path = $file_path . ".in";
+            $out_file_path = $file_path . ".out";
+            $real_parse_out_file_path = $file_path . ".parse_out";
+            $real_int_out_file_path = $file_path . ".int_out";
+
+            $test_result->expected_rc = file_get_contents($rc_file_path);
+
+            exec('php7.4 '. $this->parse_script . ' < ' . $src_file_path . ' > ' . $real_parse_out_file_path, $dev_null, $test_result->real_rc);
+
+            if ($test_result->real_rc == '0')  // parsed successfully
+            {
+                exec('python3.8 ' . $this->int_script . ' --input=' . $in_file_path . ' --source=' . $real_parse_out_file_path . ' > ' . $real_int_out_file_path, $dev_null, $test_result->real_rc);
+
+                if ($test_result->expected_rc == '0')
+                {
+                    if ($test_result->real_rc == '0')
+                    {
+                        exec("diff $real_int_out_file_path $out_file_path", $dev_null, $diff_rc);
+
+                        if ($diff_rc == 0)
+                        {
+                            $test_result->comparison = 1;
+                            $test_result->test_ok = true;
+                        }
+                        else
+                        {
+                            $test_result->comparison = -1;
+                            $test_result->test_ok = false;
+                        }
+                    }
+                    else
+                    {
+                        $test_result->comparison = 0;
+                        $test_result->test_ok = false;
+                    } 
+                }
+                else
+                {
+                    if ($test_result->real_rc == $test_result->expected_rc)
+                    {
+                        $test_result->comparison = 0;
+                        $test_result->test_ok = true;
+                    }
+                    else
+                    {
+                        $test_result->comparison = 0;
+                        $test_result->test_ok = false;
+                    }
+                }
+
+                unlink($real_int_out_file_path);
+            }
+            else
+            {
+                if ($test_result->real_rc == $test_result->expected_rc)
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = true;
+                }
+                else
+                {
+                    $test_result->comparison = 0;
+                    $test_result->test_ok = false;
+                }
+            }
+
+            unlink($real_parse_out_file_path);
+            return $test_result;
         }
     }
 
     class TestResult
     {
-        public $rc_parse_real;
-        public $rc_parse_expected;
-        public $rc_int_real;
-        public $rc_int_expected;
-        public $result; // bool
+        public $test_file;
+        public $expected_rc;
+        public $real_rc;
+        public $comparison; // -1, 0, 1
+        public $test_ok; // bool
     }
 
 
@@ -151,8 +330,8 @@
     // process --int-script argument
     if (!$parse_only)
     {
-        $interpret_script = array_key_exists("int-script", $options) ? $options['int-script'] : 'interpret.py';
-        if (!is_file($interpret_script))
+        $int_script = array_key_exists("int-script", $options) ? $options['int-script'] : 'interpret.py';
+        if (!is_file($int_script))
         {
             fwrite(STDERR, "Interpret script not found\n");
             exit(ExitCodesEnum::InputFileError);   
@@ -160,18 +339,12 @@
     }
     else
     {
-        $interpret_script = false;
+        $int_script = false;
     }
 
     // process --jexamxml
     $jexamxml = array_key_exists("jexamxml", $options) ? $options['jexamxml'] : '/pub/courses/ipp/jexamxml/jexamxml.jar';
 
-    echo "test dir:" . $test_directory . "\n";
-    print sprintf("recursive: %b", $recursive) . "\n";
-    echo "parser:" . $parse_script . "\n";
-    echo "interpret:" . $interpret_script . "\n";
-    echo "jexamxml:" . $jexamxml . "\n\n";
-    // todo delete
 
     $test_files_list = array();
     // create list of test files (without extenstion)
@@ -237,21 +410,39 @@
 
     if ($parse_only)
     {
-        $tester = new ParseOnlyTester();
+        $tester = new ParseOnlyTester($parse_script, $jexamxml);
     }
     elseif ($int_only)
     {
-        $tester = new IntOnlyTester();
+        $tester = new IntOnlyTester($int_script, $jexamxml);
     }
     else
     {
-        $tester = new BothTester();
+        $tester = new BothTester($parse_script, $int_script, $jexamxml);
     }
 
-
+    $total_tests = 0;
+    $successful_tests = 0;
+    $wrong_tests = 0;
+    $test_result_list = array();
     foreach ($test_files_list as $file)
     {
         $test_result = $tester->run_test_file($file);
-        echo $test_result . "\n"; delt
+        array_push($test_result_list, $test_result);
+
+        $total_tests++;
+        if ($test_result->test_ok)
+        {
+            $successful_tests++;
+        }
+        else
+        {
+            $wrong_tests++;
+        }
     }
+
+    $percentage = $successful_tests / $total_tests * 100;
+    
+
+    include("template.html");
 ?>
