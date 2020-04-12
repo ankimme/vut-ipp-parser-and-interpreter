@@ -35,6 +35,12 @@ class Interpret:
             "TF": None
         }
 
+    def check_syntax(self):
+        syntax_analyser = SyntaxAnalyser()
+
+        for ins in self.instructions:
+            syntax_analyser.check_instruction(ins)
+
     def read_xml_source(self):
         """
         Read xml source file or stdin, based on arguments given to the script
@@ -139,27 +145,21 @@ class Interpret:
 
     def execute(self):
         """
-        Interpret source code.
+        Run interpretation.
         """
-        print("--------RUN--------")
-
-        # interpretation body
         self.i = 0
         while self.i < len(self.instructions):
             instruction = self.instructions[self.i]
             instruction_handler = self.instruction_swticher(instruction.opcode)
             instruction_handler(instruction)
             self.i += 1
-            # todo jump to not discovered labels
-
-        print("--------END--------")
 
     def create_instructions_array(self):
         for element in self.root:
             self.instructions.append(Instruction(element))
 
         self.instructions.sort(key=lambda x: x.order)
-
+        # todo check for dupliacats and negative
         for i, ins in enumerate(self.instructions):
             ins.real_order = i
 
@@ -618,10 +618,65 @@ class Instruction:
     # todo lex and syn control
 
 
+class SyntaxAnalyser:
+
+    def __init__(self):
+        self.expected_types = dict()
+        self.expected_types["MOVE"] = ["var", "sym"]
+        self.expected_types["CREATEFRAME"] = []
+        self.expected_types["PUSHFRAME"] = []
+        self.expected_types["POPFRAME"] = []
+        self.expected_types["DEFVAR"] = ["var"]
+        self.expected_types["CALL"] = ["lab"]
+        self.expected_types["RETURN"] = ["lab"]
+
+        # append missing None values so that each element is a list of 3 values
+        for key, value in self.expected_types.items():
+            none_to_be_appended = 3 - len(value)
+            for i in range(none_to_be_appended):
+                value.append(None)
+
+    def check_instruction(self, ins):
+        if ins.opcode not in self.expected_types:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown instruction.\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+        for i, expected_type in enumerate(self.expected_types[ins.opcode]):
+            if i == 0:
+                arg_val = ins.arg1_value
+                arg_type = ins.arg1_type
+            elif i == 1:
+                arg_val = ins.arg2_value
+                arg_type = ins.arg2_type
+            else:
+                arg_val = ins.arg2_value
+                arg_type = ins.arg2_type
+
+            if expected_type == "var":
+                if arg_type not in ["var"]:
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                    exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+                if not re.match('^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$', arg_val):
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                    exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+            elif expected_type == "symb":
+                pass
+            elif expected_type == "lab":
+                pass
+            else:  # no value expected
+                if arg_val is not None or arg_type is not None:
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Too many arguments.\n")
+                    exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
+
 interpret = Interpret()
-interpret.create_instructions_array()
 interpret.check_xml_structure()
+interpret.create_instructions_array()
+interpret.check_syntax()
 interpret.search_labels()
 interpret.execute()
 
 # todo check double order and negative
+# duplicit argument
