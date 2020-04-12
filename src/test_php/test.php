@@ -1,13 +1,11 @@
-#!/usr/bin/env php7.4
-
 <?php
 
-    interface Tester
+    interface TesterInterface
     {
         public function run_test_file($file_path);
     }
 
-    class ParseOnlyTester implements Tester
+    class ParseOnlyTester implements TesterInterface
     {
         function __construct($parse_script, $jexamxml) {
             $this->parse_script = $parse_script;
@@ -76,7 +74,7 @@
         }
     }
 
-    class IntOnlyTester implements Tester
+    class IntOnlyTester implements TesterInterface
     {
         function __construct($int_script, $jexamxml) {
             $this->int_script = $int_script;
@@ -144,7 +142,7 @@
         }
     }
 
-    class BothTester implements Tester
+    class BothTester implements TesterInterface
     {
         function __construct($parse_script, $int_script, $jexamxml) {
             $this->parse_script = $parse_script;
@@ -242,8 +240,18 @@
         public $test_ok; // bool
     }
 
-
-    require_once 'exitCodes.php';
+    // appliacation exit codes
+    abstract class ExitCodesEnum
+    {
+        const Success = 0;
+        const ArgumentError = 10;
+        const InputFileError = 11;
+        const OutputFileError = 12;
+        const InvalidHeader = 21;
+        const InvalidOpCode = 22;
+        const LexicalOrSyntaxError = 23;
+        const InternalError = 99;
+    }
 
     $options = getopt("h", ["help", "directory:", "recursive", "parse-script::", "int-script::", "parse-only", "int-only", "jexamxml::"]);
     
@@ -276,7 +284,7 @@
     {
         if (is_dir($options['directory']))
         {
-            $test_directory = $options['directory'];
+            $test_directory = rtrim($options['directory'], "/");
         }
         else
         {
@@ -445,4 +453,5 @@
     
 
     include("template.html");
+    
 ?>
