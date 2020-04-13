@@ -1,3 +1,7 @@
+# Author: Andrea Chimenti <xchime00>
+# VUT FIT 2020
+# IPP project
+
 import xml.etree.ElementTree as ET
 import argparse
 import sys
