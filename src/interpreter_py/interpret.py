@@ -9,6 +9,7 @@ from operator import itemgetter
 class Interpret:
 
     def __init__(self):
+        """Create needed data structures"""
         self.arguments = self.process_arguments()
         if (self.arguments.source == self.arguments.input):
             sys.stderr.write("Invalid arguments\n")
@@ -36,6 +37,7 @@ class Interpret:
         }
 
     def check_syntax(self):
+        """Look for duplicit order values and contol that every instuction has proper arguments"""
         syntax_analyser = SyntaxAnalyser()
 
         order_values_list = [x.order for x in self.instructions]
@@ -59,7 +61,7 @@ class Interpret:
                 sys.stderr.write(f"Input file '{self.arguments.source}' not found\n")
                 exit(ec.INPUT_FILE_ERROR)
         else:
-            xml_string = sys.stdin.read()  # todo handle error
+            xml_string = sys.stdin.read()
         return xml_string
 
     def read_input(self):
@@ -93,13 +95,6 @@ class Interpret:
             help="path to input file containing program input of the executed IPPcode20 script.")
         return argument_parser.parse_args()
 
-    def check_xml_structure(self):
-        """
-        Control
-        """
-        self.check_root_element()
-        # todo check other stuff
-
     def check_root_element(self):
         """
         Control if the root element of the xml is valid
@@ -123,6 +118,9 @@ class Interpret:
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
     def extract_value_from_symbol(self, ins, symbol_type, symbol_value, return_undefined=False):
+        """
+        Return value of variable or constant
+        """
         if symbol_type == "var":  # variable
             frame, variable_name = symbol_value.split("@")
             try:
@@ -163,6 +161,9 @@ class Interpret:
             self.i += 1
 
     def create_instructions_array(self):
+        """
+        Create an array of Instruction instances (one for each instruction in the xml)
+        """
         for element in self.root:
             if element.tag != "instruction":
                 sys.stderr.write(f"Unknown element.\n")
@@ -175,6 +176,9 @@ class Interpret:
             ins.real_order = i
 
     def search_labels(self):
+        """
+        Create an array with all labels in the xml
+        """
         for i, ins in enumerate(self.instructions):
             if ins.opcode == "LABEL":
                 if ins.arg1_value in self.labels:
@@ -239,6 +243,9 @@ class Interpret:
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
     def store_variable_value(self, ins, frame, var_name, value):
+        """
+        Save 'value' to the selected variable in the selected frame
+        """
         try:
             if var_name in self.frames[frame]:
                 self.frames[frame][var_name] = value
@@ -253,6 +260,9 @@ class Interpret:
             exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
 
     def load_variable_value(self, ins, frame, var_name):
+        """
+        Return 'value' of the selected variable 'var_name' in the selected frame 'frame'
+        """
         try:
             return self.frames[frame][var_name]
         except TypeError:
@@ -261,8 +271,6 @@ class Interpret:
         except KeyError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
             exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)    
-
-    # functions for instuction handling
 
     def ins_move(self, ins):
         """
@@ -358,6 +366,9 @@ class Interpret:
             exit(ec.RUNTIME_MISSING_VALUE_ERROR)
 
     def ins_math_or_logical_operation(self, ins):
+        """
+        Execute ADD, SUB, MUL, IDIV, EQ, LT, GT, AND, OR or CONCAT instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
         left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
@@ -416,6 +427,9 @@ class Interpret:
         self.store_variable_value(ins, frame, var_name, result)
 
     def ins_not(self, ins):
+        """
+        Execute NOT instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
         symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         if type(symbol_value) != bool:
@@ -425,6 +439,9 @@ class Interpret:
         self.store_variable_value(ins, frame, var_name, not symbol_value)
 
     def ins_int2char(self, ins):
+        """
+        Execute INT2CHAR instruction
+        """
         symb_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         frame, var_name = ins.arg1_value.split("@")
 
@@ -441,6 +458,9 @@ class Interpret:
         self.store_variable_value(ins, frame, var_name, result)
 
     def ins_stri2int_getchar(self, ins):
+        """
+        Execute STRI2INT or GETCHAR instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
         left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
@@ -465,6 +485,9 @@ class Interpret:
         self.store_variable_value(ins, frame, var_name, result)
 
     def ins_read(self, ins):
+        """
+        Execute READ instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
 
         if self.arguments.input:
@@ -527,6 +550,9 @@ class Interpret:
                 exit(ec.SEMANTIC_ERROR)
 
     def ins_strlen(self, ins):
+        """
+        Execute STRLEN instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
         symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
 
@@ -537,6 +563,9 @@ class Interpret:
         self.store_variable_value(ins, frame, var_name, len(symbol_value))
 
     def ins_setchar(self, ins):
+        """
+        Execute SETCHAR instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
         left_operand = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         right_operand = self.extract_value_from_symbol(ins, ins.arg3_type, ins.arg3_value)
@@ -566,6 +595,9 @@ class Interpret:
             exit(ec.RUNTIME_STRING_ERROR)
 
     def ins_type(self, ins):
+        """
+        Execute TYPE instruction
+        """
         frame, var_name = ins.arg1_value.split("@")
         symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value, return_undefined=True)
 
@@ -597,7 +629,7 @@ class Interpret:
 
     def ins_jump_on_condition(self, ins):
         """
-        Execute JUMPIFEQ and JUMPIFNEQ instructions
+        Execute JUMPIFEQ or JUMPIFNEQ instruction
         """
         if ins.arg1_value not in self.labels:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Label not found.\n")
@@ -623,6 +655,9 @@ class Interpret:
                 self.i = self.labels[ins.arg1_value] - 1
 
     def ins_exit(self, ins):
+        """
+        Execute EXIT instruction
+        """
         exit_code = self.extract_value_from_symbol(ins, ins.arg1_type, ins.arg1_value)
 
         if type(exit_code) != int:
@@ -636,10 +671,16 @@ class Interpret:
             exit(ec.RUNTIME_OPERAND_VALUE_ERROR)
 
     def ins_dprint(self, ins):
+        """
+        Execute DPRINT instruction
+        """
         symbol_value = self.extract_value_from_symbol(ins, ins.arg1_type, ins.arg1_value)
         sys.stderr.write(str(symbol_value))
 
     def ins_break(self, ins):
+        """
+        Execute BREAK instruction
+        """
         sys.stderr.write(f"Inner instruction counter: {self.i}\n")
         sys.stderr.write(f"Total local frames: {len(self.local_frame_stack)}\n")
         sys.stderr.write(f"Data stack: {self.data_stack}\n")
@@ -650,11 +691,14 @@ class Interpret:
 
 class Instruction:
     """
-    Encapsulates information of the instruction.
+    Encapsulate information of instructions.
     An instance should be created for each processed instruction.
     """
 
     def __init__(self, instruction_element):
+        """
+        Save and parse instruction parameters to instance attributes
+        """
         if 'opcode' in instruction_element.attrib:
             self.opcode = instruction_element.attrib['opcode'].upper()
         else:
@@ -709,8 +753,14 @@ class Instruction:
 
 
 class SyntaxAnalyser:
+    """
+    Provide functions for syntax and lexical analysis
+    """
 
     def __init__(self):
+        """
+        Create an array of expected types
+        """
         self.expected_types = dict()
         self.expected_types["MOVE"] = ["var", "sym"]
         self.expected_types["CREATEFRAME"] = []
@@ -755,6 +805,9 @@ class SyntaxAnalyser:
                 value.append(None)
 
     def check_instruction(self, ins):
+        """
+        Check if the instance of instruction is syntactically valid
+        """
         if ins.opcode not in self.expected_types:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown instruction.\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
@@ -815,13 +868,8 @@ class SyntaxAnalyser:
 
 
 interpret = Interpret()
-interpret.check_xml_structure()
+interpret.check_root_element()
 interpret.create_instructions_array()
 interpret.check_syntax()
 interpret.search_labels()
 interpret.execute()
-
-# todo check double order and negative
-# duplicit argument
-# test bool TRuE
-# pristup to ramcu

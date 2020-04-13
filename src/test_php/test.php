@@ -1,10 +1,16 @@
 <?php
 
+    /**
+     * Interface of tester classes
+     */
     interface TesterInterface
     {
         public function run_test_file($file_path);
     }
 
+    /**
+     * Used when testing only parse.php
+     */
     class ParseOnlyTester implements TesterInterface
     {
         function __construct($parse_script, $jexamxml) {
@@ -14,7 +20,12 @@
 
         public $test_mode = "Parser only";
 
-        // $file_path - path of test file, must not contain extension of file
+        /**
+         * Run a single test of parse.php
+         * 
+         * @param $file_path Path of the test file WITHOUT extenstion
+         * @return TestResult Results of the test as an object
+         */
         public function run_test_file($file_path)
         {
             $test_result = new TestResult();
@@ -34,9 +45,8 @@
                 if ($test_result->real_rc == '0')
                 {
                     $delta_file_path = $file_path . ".delta";
-                    exec("java -jar $this->jexamxml $real_out_file_path $out_file_path $delta_file_path", $jexamsml_output, $jexamxml_rc);
-                    // todo uncomment !!!
-                    // exec("java -jar $this->jexamxml $real_out_file_path $out_file_path $delta_file_path /pub/courses/ipp/jexamxml/options", $jexamsml_output, $jexamxml_rc);
+                    // exec("java -jar $this->jexamxml $real_out_file_path $out_file_path $delta_file_path", $jexamsml_output, $jexamxml_rc); use this if not executing on server Merlin
+                    exec("java -jar $this->jexamxml $real_out_file_path $out_file_path $delta_file_path /pub/courses/ipp/jexamxml/options", $jexamsml_output, $jexamxml_rc);
                     unlink($delta_file_path);
                     if ($jexamxml_rc == 0)
                     {
@@ -74,6 +84,9 @@
         }
     }
 
+    /**
+     * Used when testing only interpret.py
+     */
     class IntOnlyTester implements TesterInterface
     {
         function __construct($int_script, $jexamxml) {
@@ -83,7 +96,12 @@
 
         public $test_mode = "Interpret only";
 
-        // $file_path - path of test file, must not contain extension of file
+        /**
+         * Run a single test of interpret.py
+         * 
+         * @param $file_path Path of the test file WITHOUT extenstion
+         * @return TestResult Results of the test as an object
+         */
         public function run_test_file($file_path)
         {
             $test_result = new TestResult();
@@ -142,6 +160,9 @@
         }
     }
 
+    /**
+     * Used when testing both parse.php and interpret.py
+     */
     class BothTester implements TesterInterface
     {
         function __construct($parse_script, $int_script, $jexamxml) {
@@ -152,7 +173,12 @@
 
         public $test_mode = "Both";
 
-        // $file_path - path of test file, must not contain extension of file
+        /**
+         * Run a single test of parse.php and interpret.py
+         * 
+         * @param $file_path Path of the test file WITHOUT extenstion
+         * @return TestResult Results of the test as an object
+         */
         public function run_test_file($file_path)
         {
             $test_result = new TestResult();
@@ -231,6 +257,9 @@
         }
     }
 
+    /**
+     * Used to store values of test results
+     */
     class TestResult
     {
         public $test_file;
@@ -240,7 +269,9 @@
         public $test_ok; // bool
     }
 
-    // appliacation exit codes
+    /**
+     * appliacation exit codes
+     */
     abstract class ExitCodesEnum
     {
         const Success = 0;
@@ -453,5 +484,5 @@
     
 
     include("template.html");
-    
+
 ?>
