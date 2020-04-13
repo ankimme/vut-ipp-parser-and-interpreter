@@ -3,7 +3,7 @@
 * Verze: 2020-02-11
   
 Testy jsou ve formátu, který odpovídá vstupům skriptu `test.php`. Při nalezení chyby prosím kontaktujte autora. V případě, že budete odevzdávat testy (nejlépe v podadresáři `tests` v archivu vámi vypracované úlohy), které jste nevypracovávali sami, tak prosím uveďte též jejich zdroj či autora například ve speciálním README souboru uloženém u testů.
-Některé testovací soubory/data byly po vygenerování ručně pozměněny, aby lépe otestovaly schopnost vašich skriptů a upozornily na alternativní možnosti ve výstupech (např. zkrácený zápis prázdných značek XML).
+Některé testovací soubory/data byly po vygenerování ručně pozměněny, aby lépe otestovaly schopnost vašich skriptů a upozornily na alternativní možnosti ve výstupech (např. zkrácený zápis prázdných značek XML). Použitá adresářová struktura je pouze ilustrační a v hodnotících testech může být zcela odlišná.
 
 ## Obsažené adresáře
  * `both` - adresář s testy pro kompletní zpracování skriptem `test.php` bez nutnosti dodatečných parametrů
