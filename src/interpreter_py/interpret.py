@@ -136,7 +136,7 @@ class Interpret:
         if symbol_type == "int":
             return int(symbol_value)
         if symbol_type == "bool":
-            return True if symbol_value == "true" else False
+            return True if symbol_value.lower() == "true" else False
         elif symbol_type == "nil":
             return (None, True)
         else:
@@ -628,7 +628,35 @@ class SyntaxAnalyser:
         self.expected_types["POPFRAME"] = []
         self.expected_types["DEFVAR"] = ["var"]
         self.expected_types["CALL"] = ["lab"]
-        self.expected_types["RETURN"] = ["lab"]
+        self.expected_types["RETURN"] = []
+        self.expected_types["PUSHS"] = ["sym"]
+        self.expected_types["POPS"] = ["var"]
+        self.expected_types["ADD"] = ["var", "sym", "sym"]
+        self.expected_types["SUB"] = ["var", "sym", "sym"]
+        self.expected_types["MUL"] = ["var", "sym", "sym"]
+        self.expected_types["IDIV"] = ["var", "sym", "sym"]
+        self.expected_types["LT"] = ["var", "sym", "sym"]
+        self.expected_types["GT"] = ["var", "sym", "sym"]
+        self.expected_types["EQ"] = ["var", "sym", "sym"]
+        self.expected_types["AND"] = ["var", "sym", "sym"]
+        self.expected_types["OR"] = ["var", "sym", "sym"]
+        self.expected_types["NOT"] = ["var", "sym"]
+        self.expected_types["INT2CHAR"] = ["var", "sym"]
+        self.expected_types["STRI2INT"] = ["var", "sym", "sym"]
+        self.expected_types["READ"] = ["var", "typ"]
+        self.expected_types["WRITE"] = ["sym"]
+        self.expected_types["CONCAT"] = ["var", "sym", "sym"]
+        self.expected_types["STRLEN"] = ["var", "sym"]
+        self.expected_types["GETCHAR"] = ["var", "sym", "sym"]
+        self.expected_types["SETCHAR"] = ["var", "sym", "sym"]
+        self.expected_types["TYPE"] = ["var", "sym"]
+        self.expected_types["LABEL"] = ["lab"]
+        self.expected_types["JUMP"] = ["lab"]
+        self.expected_types["JUMPIFEQ"] = ["lab", "sym", "sym"]
+        self.expected_types["JUMPIFNEQ"] = ["lab", "sym", "sym"]
+        self.expected_types["EXIT"] = ["sym"]
+        self.expected_types["DPRINT"] = ["sym"]
+        self.expected_types["BREAK"] = []
 
         # append missing None values so that each element is a list of 3 values
         for key, value in self.expected_types.items():
@@ -649,22 +677,47 @@ class SyntaxAnalyser:
                 arg_val = ins.arg2_value
                 arg_type = ins.arg2_type
             else:
-                arg_val = ins.arg2_value
-                arg_type = ins.arg2_type
+                arg_val = ins.arg3_value
+                arg_type = ins.arg3_type
 
             if expected_type == "var":
-                if arg_type not in ["var"]:
+                if arg_type != "var" or not re.match('^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$', arg_val):
                     sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
                     exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-                if not re.match('^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$', arg_val):
+            elif expected_type == "sym":
+                if arg_type == "var":
+                    if not re.match('^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$', arg_val):
+                        sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                        exit(ec.XML_WRONG_STRUCTURE_ERROR)
+                elif arg_type == "string":
+                    if not re.match('^\S*$', arg_val) or "#" in arg_val:
+                        sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                        exit(ec.XML_WRONG_STRUCTURE_ERROR)
+                elif arg_type == "int":
+                    if not re.match('^[\-]?[1-9][0-9]*$', arg_val):
+                        sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                        exit(ec.XML_WRONG_STRUCTURE_ERROR)
+                elif arg_type == "bool":
+                    if not re.match('^(true|false)$', arg_val, re.IGNORECASE):
+                        sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                        exit(ec.XML_WRONG_STRUCTURE_ERROR)
+                elif arg_type == "nil":
+                    if not re.match('^nil$', arg_val, re.IGNORECASE):
+                        sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                        exit(ec.XML_WRONG_STRUCTURE_ERROR)
+                else:
                     sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
                     exit(ec.XML_WRONG_STRUCTURE_ERROR)
-
-            elif expected_type == "symb":
                 pass
             elif expected_type == "lab":
-                pass
+                if arg_type != "label" or not re.match('^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$', arg_val):
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                    exit(ec.XML_WRONG_STRUCTURE_ERROR)
+            elif expected_type == "typ":
+                if arg_type != "type" or not re.match('^(int|string|bool)$', arg_val):
+                    sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
+                    exit(ec.XML_WRONG_STRUCTURE_ERROR)
             else:  # no value expected
                 if arg_val is not None or arg_type is not None:
                     sys.stderr.write(f"({ins.order}){ins.opcode}: Too many arguments.\n")
@@ -680,3 +733,5 @@ interpret.execute()
 
 # todo check double order and negative
 # duplicit argument
+# test bool TRuE
+# pristup to ramcu
