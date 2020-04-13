@@ -38,6 +38,11 @@ class Interpret:
     def check_syntax(self):
         syntax_analyser = SyntaxAnalyser()
 
+        order_values_list = [x.order for x in self.instructions]
+        if len(order_values_list) != len(set(order_values_list)):
+            sys.stderr.write(f"Duplicit order\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
         for ins in self.instructions:
             syntax_analyser.check_instruction(ins)
 
@@ -159,10 +164,13 @@ class Interpret:
 
     def create_instructions_array(self):
         for element in self.root:
+            if element.tag != "instruction":
+                sys.stderr.write(f"Unknown element.\n")
+                exit(ec.XML_WRONG_STRUCTURE_ERROR)
             self.instructions.append(Instruction(element))
 
         self.instructions.sort(key=lambda x: x.order)
-        # todo check for dupliacats and negative
+
         for i, ins in enumerate(self.instructions):
             ins.real_order = i
 
@@ -647,15 +655,25 @@ class Instruction:
     """
 
     def __init__(self, instruction_element):
-        self.opcode = instruction_element.attrib['opcode']
+        if 'opcode' in instruction_element.attrib:
+            self.opcode = instruction_element.attrib['opcode'].upper()
+        else:
+            sys.stderr.write("Non existent opcode\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
         try:
             self.order = int(instruction_element.attrib['order'])
         except ValueError:
             sys.stderr.write("Order attribute value not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
+        except KeyError:
+            sys.stderr.write("Non existent order\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-        # arguments are tuples (type, value)
+        if self.order < 1:
+            sys.stderr.write("Negative order\n")
+            exit(ec.XML_WRONG_STRUCTURE_ERROR)
+
         arg_element = instruction_element.find("arg1")
         if arg_element is not None:
             if arg_element.attrib['type'] == "string" and arg_element.text is None:
@@ -688,8 +706,6 @@ class Instruction:
         else:
             self.arg3_value = None
             self.arg3_type = None
-
-    # todo lex and syn control
 
 
 class SyntaxAnalyser:
