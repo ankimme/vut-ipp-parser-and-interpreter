@@ -23,9 +23,7 @@ class Interpret:
             exit(ec.XML_NOT_WELL_FORMED_ERROR)
 
         self.instructions = []
-        # self.temporary_frame = None
         self.local_frame_stack = []
-        # self.global_frame = dict()
         self.data_stack = []
         self.labels = dict()
         self.call_stack = []
