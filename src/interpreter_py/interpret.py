@@ -117,14 +117,17 @@ class Interpret:
             sys.stderr.write("Expected 'program' element attribute to be 'language=ippcode20'\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-    def extract_value_from_symbol(self, ins, symbol_type, symbol_value):
+    def extract_value_from_symbol(self, ins, symbol_type, symbol_value, return_undefined=False):
         if symbol_type == "var":  # variable
             frame, variable_name = symbol_value.split("@")
             try:
                 var_value = self.load_variable_value(ins, frame, variable_name)
                 if var_value == (None, False):
-                    sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{variable_name}'.\n")
-                    exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
+                    if return_undefined:
+                        return (None, False)
+                    else:
+                        sys.stderr.write(f"({ins.order}){ins.opcode}: Undefined variable '{variable_name}'.\n")
+                        exit(ec.RUNTIME_MISSING_VALUE_ERROR)
             except KeyError:
                 sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{variable_name}'.\n")
                 exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
@@ -310,8 +313,12 @@ class Interpret:
         """
         Execute CALL instruction
         """
-        self.call_stack.append(self.i)
-        self.i = self.labels[ins.arg1_value]
+        if ins.arg1_value in self.labels:
+            self.call_stack.append(self.i)
+            self.i = self.labels[ins.arg1_value]
+        else:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Label '{ins.arg1_value}' not found.\n")
+            exit(ec.SEMANTIC_ERROR)
 
     def ins_return(self, ins):
         """
@@ -386,7 +393,7 @@ class Interpret:
         elif ins.opcode == "EQ":
             if all(x == (None, True) for x in [left_operand, right_operand]):  # nil = nil
                 result = True
-            if any(x == (None, True) for x in [left_operand, right_operand]):  # nil != other data types
+            elif any(x == (None, True) for x in [left_operand, right_operand]):  # nil != other data types
                 result = False
             else:
                 if type(left_operand) != type(right_operand):
@@ -413,11 +420,12 @@ class Interpret:
         symb_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         frame, var_name = ins.arg1_value.split("@")
 
-        try:
-            result = chr(symb_value)
-        except TypeError:
+        if type(symb_value) != int:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value must be integer.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+
+        try:
+            result = chr(symb_value)
         except ValueError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value not in Unicode range.\n")
             exit(ec.RUNTIME_STRING_ERROR)
@@ -529,8 +537,20 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong operand type.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
+        old_value = self.load_variable_value(ins, frame, var_name)
+        if old_value == (None, False):
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong operand type.\n")
+            exit(ec.RUNTIME_MISSING_VALUE_ERROR)
+        if type(old_value) != str:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong operand type.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+        old_value = str(old_value)
+
+        if left_operand < 0 or left_operand >= len(old_value):
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Ivalid string.\n")
+            exit(ec.RUNTIME_STRING_ERROR)
+
         try:
-            old_value = self.load_variable_value(ins, frame, var_name)
             new_value = old_value[0:left_operand] + right_operand[0] + old_value[left_operand + 1:]
             self.store_variable_value(ins, frame, var_name, new_value)
         except IndexError:
@@ -539,7 +559,7 @@ class Interpret:
 
     def ins_type(self, ins):
         frame, var_name = ins.arg1_value.split("@")
-        symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value, return_undefined=True)
 
         if type(symbol_value) == str:
             self.store_variable_value(ins, frame, var_name, "string")
