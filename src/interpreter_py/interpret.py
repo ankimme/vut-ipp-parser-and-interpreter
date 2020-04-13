@@ -121,7 +121,7 @@ class Interpret:
         if symbol_type == "var":  # variable
             frame, variable_name = symbol_value.split("@")
             try:
-                var_value = self.frames[frame][variable_name]
+                var_value = self.load_variable_value(ins, frame, variable_name)
                 if var_value == (None, False):
                     sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{variable_name}'.\n")
                     exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
@@ -130,7 +130,7 @@ class Interpret:
                 exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
             return var_value
         elif symbol_type == "string":
-            for x in list(range(33)) + [35, 92]:
+            for x in list(range(99)):
                 symbol_value = symbol_value.replace("\\0" + str(x).zfill(2), chr(x))
             return symbol_value
         if symbol_type == "int":
@@ -227,6 +227,30 @@ class Interpret:
             sys.stderr.write(f"Opcode {opcode} not valid\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
+    def store_variable_value(self, ins, frame, var_name, value):
+        try:
+            if var_name in self.frames[frame]:
+                self.frames[frame][var_name] = value
+            else:
+                sys.stderr.write(f"({ins.order}){ins.opcode}: Undefined variable '{var_name}'.\n")
+                exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
+        except TypeError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Frame '{frame}' not initialized.\n")
+            exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        except KeyError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
+            exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
+
+    def load_variable_value(self, ins, frame, var_name):
+        try:
+            return self.frames[frame][var_name]
+        except TypeError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Frame '{frame}' not initialized.\n")
+            exit(ec.RUNTIME_UNDEFINED_FRAME_ERROR)
+        except KeyError:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
+            exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)    
+
     # functions for instuction handling
 
     def ins_move(self, ins):
@@ -234,7 +258,8 @@ class Interpret:
         Execute MOVE instruction
         """
         dst_frame, dst_var_name = ins.arg1_value.split("@")
-        self.frames[dst_frame][dst_var_name] = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        new_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
+        self.store_variable_value(ins, dst_frame, dst_var_name, new_value)
 
     def ins_create_frame(self, ins):
         """
@@ -311,7 +336,8 @@ class Interpret:
         """
         if self.data_stack:
             frame, var_name = ins.arg1_value.split("@")
-            self.frames[frame][var_name] = self.data_stack.pop()
+            popped_value = self.data_stack.pop()
+            self.store_variable_value(ins, frame, var_name, popped_value)
         else:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Data stack is empty.\n")
             exit(ec.RUNTIME_MISSING_VALUE_ERROR)
@@ -372,7 +398,7 @@ class Interpret:
         elif ins.opcode == "OR":
             result = left_operand or right_operand
 
-        self.frames[frame][var_name] = result
+        self.store_variable_value(ins, frame, var_name, result)
 
     def ins_not(self, ins):
         frame, var_name = ins.arg1_value.split("@")
@@ -380,20 +406,23 @@ class Interpret:
         if type(symbol_value) != bool:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value must be of bool type.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
-        self.frames[frame][var_name] = not symbol_value
+
+        self.store_variable_value(ins, frame, var_name, not symbol_value)
 
     def ins_int2char(self, ins):
         symb_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
         frame, var_name = ins.arg1_value.split("@")
 
         try:
-            self.frames[frame][var_name] = chr(symb_value)
+            result = chr(symb_value)
         except TypeError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value must be integer.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
         except ValueError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Value not in Unicode range.\n")
             exit(ec.RUNTIME_STRING_ERROR)
+
+        self.store_variable_value(ins, frame, var_name, result)
 
     def ins_stri2int_getchar(self, ins):
         frame, var_name = ins.arg1_value.split("@")
@@ -404,22 +433,36 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Wrong value type.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
+        if right_operand < 0:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Index out of boundaries.\n")
+            exit(ec.RUNTIME_STRING_ERROR)
+
         try:
             if ins.opcode == "STRI2INT":
-                self.frames[frame][var_name] = ord(left_operand[right_operand])
+                result = ord(left_operand[right_operand])
             else:
-                self.frames[frame][var_name] = left_operand[right_operand]
+                result = left_operand[right_operand]
         except IndexError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Index out of boundaries.\n")
             exit(ec.RUNTIME_STRING_ERROR)
+
+        self.store_variable_value(ins, frame, var_name, result)
 
     def ins_read(self, ins):
         frame, var_name = ins.arg1_value.split("@")
 
         if self.arguments.input:
-            input_value = self.input_list.pop().strip()
+            if len(self.input_list) == 0:
+                self.store_variable_value(ins, frame, var_name, (None, True))
+                return
+            else:
+                input_value = self.input_list.pop().strip()
         else:
-            input_value = input()
+            try:
+                input_value = input()
+            except EOFError:
+                self.store_variable_value(ins, frame, var_name, (None, True))
+                return
 
         if ins.arg2_value == "string":
             result = input_value
@@ -427,14 +470,14 @@ class Interpret:
             try:
                 result = int(input_value)
             except ValueError:
-                result = (None, False)
+                result = (None, True)
         elif ins.arg2_value == "bool":
             result = bool(re.match("^true$", input_value, re.IGNORECASE))
         else:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown type.\n")
             exit(ec.XML_WRONG_STRUCTURE_ERROR)
 
-        self.frames[frame][var_name] = result
+        self.store_variable_value(ins, frame, var_name, result)
 
     def ins_write(self, ins):
         """
@@ -442,11 +485,7 @@ class Interpret:
         """
         if ins.arg1_type == "var":  # variable
             frame, var_name = ins.arg1_value.split("@")
-            try:
-                var_value = self.frames[frame][var_name]
-            except KeyError:
-                sys.stderr.write(f"({ins.order}){ins.opcode}: Unknown variable '{var_name}'.\n")
-                exit(ec.RUNTIME_UNDEFINED_VARIABLE_ERROR)
+            var_value = self.load_variable_value(ins, frame, var_name)
 
             if type(var_value) is bool:
                 print("true", end='') if var_value else print("false", end='')
@@ -479,7 +518,7 @@ class Interpret:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Operand must be string.\n")
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
-        self.frames[frame][var_name] = len(symbol_value)
+        self.store_variable_value(ins, frame, var_name, len(symbol_value))
 
     def ins_setchar(self, ins):
         frame, var_name = ins.arg1_value.split("@")
@@ -491,9 +530,9 @@ class Interpret:
             exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
 
         try:
-            old_value = self.frames[frame][var_name]
+            old_value = self.load_variable_value(ins, frame, var_name)
             new_value = old_value[0:left_operand] + right_operand[0] + old_value[left_operand + 1:]
-            self.frames[frame][var_name] = new_value
+            self.store_variable_value(ins, frame, var_name, new_value)
         except IndexError:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Ivalid string.\n")
             exit(ec.RUNTIME_STRING_ERROR)
@@ -503,15 +542,15 @@ class Interpret:
         symbol_value = self.extract_value_from_symbol(ins, ins.arg2_type, ins.arg2_value)
 
         if type(symbol_value) == str:
-            self.frames[frame][var_name] = "string"
+            self.store_variable_value(ins, frame, var_name, "string")
         elif type(symbol_value) == int:
-            self.frames[frame][var_name] = "int"
+            self.store_variable_value(ins, frame, var_name, "int")
         elif type(symbol_value) == bool:
-            self.frames[frame][var_name] = "bool"
+            self.store_variable_value(ins, frame, var_name, "bool")
         elif symbol_value == (None, True):
-            self.frames[frame][var_name] = "nil"
+            self.store_variable_value(ins, frame, var_name, "nil")
         else:
-            self.frames[frame][var_name] = ""
+            self.store_variable_value(ins, frame, var_name, "")
 
     def ins_label(self, ins):
         """
@@ -556,8 +595,14 @@ class Interpret:
                 self.i = self.labels[ins.arg1_value] - 1
 
     def ins_exit(self, ins):
-        if ins.arg1_type == "int" and 0 <= int(ins.arg1_value) <= 49:
-            exit(int(ins.arg1_value))
+        exit_code = self.extract_value_from_symbol(ins, ins.arg1_type, ins.arg1_value)
+
+        if type(exit_code) != int:
+            sys.stderr.write(f"({ins.order}){ins.opcode}: Exit code not valid.\n")
+            exit(ec.RUNTIME_WRONG_OPERAND_TYPE_ERROR)
+
+        if 0 <= exit_code <= 49:
+            exit(exit_code)
         else:
             sys.stderr.write(f"({ins.order}){ins.opcode}: Exit code not valid.\n")
             exit(ec.RUNTIME_OPERAND_VALUE_ERROR)
@@ -593,7 +638,10 @@ class Instruction:
         # arguments are tuples (type, value)
         arg_element = instruction_element.find("arg1")
         if arg_element is not None:
-            self.arg1_value = arg_element.text
+            if arg_element.attrib['type'] == "string" and arg_element.text is None:
+                self.arg1_value = ""
+            else:
+                self.arg1_value = arg_element.text
             self.arg1_type = arg_element.attrib['type']
         else:
             self.arg1_value = None
@@ -601,7 +649,10 @@ class Instruction:
 
         arg_element = instruction_element.find("arg2")
         if arg_element is not None:
-            self.arg2_value = arg_element.text
+            if arg_element.attrib['type'] == "string" and arg_element.text is None:
+                self.arg2_value = ""
+            else:
+                self.arg2_value = arg_element.text
             self.arg2_type = arg_element.attrib['type']
         else:
             self.arg2_value = None
@@ -609,7 +660,10 @@ class Instruction:
 
         arg_element = instruction_element.find("arg3")
         if arg_element is not None:
-            self.arg3_value = arg_element.text
+            if arg_element.attrib['type'] == "string" and arg_element.text is None:
+                self.arg3_value = ""
+            else:
+                self.arg3_value = arg_element.text
             self.arg3_type = arg_element.attrib['type']
         else:
             self.arg3_value = None
@@ -695,7 +749,7 @@ class SyntaxAnalyser:
                         sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
                         exit(ec.XML_WRONG_STRUCTURE_ERROR)
                 elif arg_type == "int":
-                    if not re.match('^[\-]?[1-9][0-9]*$', arg_val):
+                    if not re.match('^([\-]?[1-9][0-9]*|[\-]?0)$', arg_val):
                         sys.stderr.write(f"({ins.order}){ins.opcode}: Argument error.\n")
                         exit(ec.XML_WRONG_STRUCTURE_ERROR)
                 elif arg_type == "bool":
