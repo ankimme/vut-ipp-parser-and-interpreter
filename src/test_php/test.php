@@ -387,6 +387,13 @@
 
     $test_files_list = array();
     // create list of test files (without extenstion)
+    /**
+     * Create a list of test files without extensions
+     * 
+     * @param $test_directory Path of directory containing test files (with .src extension)
+     * @param $output_array The list of files will be appended to this array
+     * @param $recursive Enable searching of test files in subdirectories
+     */
     function create_file_list($test_directory, &$output_array, $recursive)
     {
         if ($recursive)
