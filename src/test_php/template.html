@@ -1,0 +1,99 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta name="description" content="VUT FIT project" />
+    <meta name="author" content="Andrea Chimenti" />
+    <title>Test.php results</title>
+    <style>
+        body
+        {
+            font-family: Arial;
+        }
+        table
+        {
+            margin-top: 50px;
+            margin-left: auto;
+            margin-right: auto;
+            border-spacing: 70px 0;
+        }
+        tr
+        {
+            text-align: left;
+        }
+        td
+        {
+            padding: 10px 0;
+        }
+        label
+        {
+            padding-right: 10px;
+            font-size: 1rem;
+        }
+        .test-ok
+        {
+            font-weight: bold;
+            color: green;
+        }
+        .test-wrong
+        {
+            font-weight: bold;
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Test.php result table</h1>
+    <h2>Mode: <?php echo $tester->test_mode; ?></h2>
+    <h3>Summary:</h3>
+    <p>Total tests: <?= $total_tests ?></p>
+    <p>Successful tests: <?= $successful_tests ?></p>
+    <p>Wrong tests: <?= $wrong_tests ?></p>
+    <p>Percentage: <?= round($percentage, 2) ?> %</p>
+    <progress max="100" value="<?= intval($percentage) ?>"></progress>
+    <hr/>
+    <table>
+        <tr>
+            <th>Test file</th>
+            <th>Expected RC</th>
+            <th>Real RC</th>
+            <th>Successful comparison</th>
+            <th>Test passed</th>
+        </tr>
+        <?php 
+            foreach ($test_result_list as $test_result)
+            {
+                echo "<tr>";
+                echo "<td>$test_result->test_file</td>";
+                echo "<td>$test_result->expected_rc</td>";
+                echo "<td>$test_result->real_rc</td>";
+                switch ($test_result->comparison)
+                {
+                    case (1):
+                        echo "<td>YES</td>";
+                        break;
+                    case (0):
+                        echo "<td />";
+                        break;
+                    case (-1):
+                       echo "<td>NO</td>";
+                       break;
+                }
+                if ($test_result->test_ok)
+                {
+                    echo "<td class='test-ok'>YES</td>";
+                }
+                else
+                {
+                    echo "<td class='test-wrong'>NO</td>";
+                }
+                echo "</tr>";
+            }
+        ?>
+    </table>
+
+</body>
+<html>

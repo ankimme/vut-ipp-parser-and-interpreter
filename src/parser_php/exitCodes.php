@@ -1,5 +1,11 @@
 <?php
 
+    /**
+     * Author: Andrea Chimenti <xchime00>
+     * VUT FIT 2020
+     * IPP project
+    */
+
      // appliacation exit codes
      abstract class ExitCodesEnum
      {

@@ -1,5 +1,11 @@
 <?php
 
+    /**
+     * Author: Andrea Chimenti <xchime00>
+     * VUT FIT 2020
+     * IPP project
+    */
+
     require_once 'exitCodes.php';
     
     // types of IPPcode20 instruction parameters

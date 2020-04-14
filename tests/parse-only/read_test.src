@@ -1,21 +1,6 @@
-
-#ksldjfglksg
-#sdgs
-
 .IPPcode20  # nacteni vstupu a vypis
-
 DEFVAR GF@a
-
-READ GF@a int # asdofj
-
-# sdokfjosdjf 
-#lkdfjglkjfg
-
-
-#lkjsdf
-
-WRITE GF@aščřščř ####
-JUMPIFEQ end GF@counter string@
-
+READ GF@a int
+WRITE GF@a
 WRITE string@\032<not-tag/>\032 # řetězec převádíme, aby byl správně uložen do XML elementu
-WRITE bool@true # zapisujeme malými písmeny
+WRITE bool@true#zapisujeme malými písmeny
